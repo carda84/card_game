@@ -1,0 +1,343 @@
+card/
+├── docs/
+│   ├── SPEC.md
+│   ├── PLAN.md
+│   ├── SPEC_PROCESS.md
+│   ├── AGENT_LOG.md
+│   └── REFLECTION.md
+│
+├── backend/
+│   ├── pom.xml
+│   ├── Dockerfile
+│   └── src/
+│       ├── main/
+│       │   ├── java/com/cardgame/
+│       │   │   ├── CardGameApplication.java
+│       │   │   │
+│       │   │   ├── config/
+│       │   │   │   ├── SecurityConfig.java              # Spring Security + JWT 配置
+│       │   │   │   ├── CorsConfig.java                  # 跨域配置
+│       │   │   │   ├── WebSocketConfig.java             # WebSocket 配置（PvP 实时对战 + 好友私信）
+│       │   │   │   └── GameConfig.java                  # 游戏全局常量与参数配置
+│       │   │   │
+│       │   │   ├── controller/
+│       │   │   │   ├── AuthController.java              # 邮箱注册/验证码/登录/登出
+│       │   │   │   ├── PlayerController.java            # 玩家信息/金币/积分排名
+│       │   │   │   ├── CardController.java              # 卡牌数据查询（卡牌池、印记、种族）
+│       │   │   │   ├── CharacterController.java         # 人物列表/人物详情
+│       │   │   │   ├── DeckController.java              # 卡组创建/编辑/校验（传奇≤3、重复上限、数量匹配）
+│       │   │   │   ├── ShopController.java              # 商店浏览/购买卡牌
+│       │   │   │   ├── BattleController.java            # 人机对战：选关卡/开始/抽牌/出牌/献祭/技能/道具/结束回合/投降
+│       │   │   │   ├── LevelController.java             # PvE关卡列表/关卡详情
+│       │   │   │   ├── PvpController.java               # 玩家对战：匹配/开始/出牌/献祭/结束回合/投降
+│       │   │   │   ├── FriendController.java            # 好友搜索/添加/删除/私信/发起对局邀请
+│       │   │   │   ├── RecordController.java            # 对战记录查询（最近20场）
+│       │   │   │   └── StatisticsController.java        # 卡牌使用率/胜率统计
+│       │   │   │
+│       │   │   ├── service/
+│       │   │   │   ├── AuthService.java                 # 接口：邮箱注册、验证码发送与校验、JWT签发
+│       │   │   │   ├── EmailService.java                # 接口：邮件发送（验证码）
+│       │   │   │   ├── PlayerService.java               # 接口：玩家数据管理（金币、积分、排名）
+│       │   │   │   ├── CardService.java                 # 接口：卡牌池查询（含印记、种族、献祭类型）
+│       │   │   │   ├── CharacterService.java            # 接口：人物查询（血量、卡组数量、主动/被动技能）
+│       │   │   │   ├── DeckService.java                 # 接口：卡组构建与校验（数量、传奇≤3、重复上限）
+│       │   │   │   ├── ShopService.java                 # 接口：商品浏览、购买扣费
+│       │   │   │   ├── BattleService.java               # 接口：战斗核心引擎（地图4v4、回合流程、初始抽牌保底1费血献祭卡、胜负判定）
+│       │   │   │   ├── LevelService.java                # 接口：PvE关卡管理
+│       │   │   │   ├── SacrificeService.java            # 接口：献祭规则判定（血献祭/骨头献祭、数量精确匹配）
+│       │   │   │   ├── TurnService.java                 # 接口：回合流程（抽牌→选牌→献祭→出牌→结算攻击）
+│       │   │   │   ├── CardLogicService.java            # 接口：印记效果解析、攻击结算、特殊卡牌逻辑
+│       │   │   │   ├── ShuffleService.java              # 接口：洗牌逻辑（永久死亡卡牌排除、重新洗牌触发）
+│       │   │   │   ├── MatchService.java                # 接口：PvP匹配（寻找同时匹配的玩家、随机配对）
+│       │   │   │   ├── PvpBattleService.java            # 接口：PvP对战逻辑（30秒回合计时、强制结束）
+│       │   │   │   ├── FriendService.java               # 接口：好友管理（搜索ID、添加、删除、私信）
+│       │   │   │   ├── RecordService.java               # 接口：对战记录（保存最近20场、双方人物与卡组）
+│       │   │   │   ├── StatisticsService.java           # 接口：卡牌使用率统计、PvP胜率计算（两位小数）
+│       │   │   │   ├── RandomEventService.java          # 接口：随机事件生成与效果执行
+│       │   │   │   ├── AIService.java                   # 接口：AI对手决策（人机对战出牌逻辑）
+│       │   │   │   └── impl/
+│       │   │   │       ├── AuthServiceImpl.java
+│       │   │   │       ├── EmailServiceImpl.java
+│       │   │   │       ├── PlayerServiceImpl.java
+│       │   │   │       ├── CardServiceImpl.java
+│       │   │   │       ├── CharacterServiceImpl.java
+│       │   │   │       ├── DeckServiceImpl.java
+│       │   │   │       ├── ShopServiceImpl.java
+│       │   │   │       ├── BattleServiceImpl.java
+│       │   │   │       ├── LevelServiceImpl.java
+│       │   │   │       ├── SacrificeServiceImpl.java
+│       │   │   │       ├── TurnServiceImpl.java
+│       │   │   │       ├── CardLogicServiceImpl.java
+│       │   │   │       ├── ShuffleServiceImpl.java
+│       │   │   │       ├── MatchServiceImpl.java
+│       │   │   │       ├── PvpBattleServiceImpl.java
+│       │   │   │       ├── FriendServiceImpl.java
+│       │   │   │       ├── RecordServiceImpl.java
+│       │   │   │       ├── StatisticsServiceImpl.java
+│       │   │   │       ├── RandomEventServiceImpl.java
+│       │   │   │       └── AIServiceImpl.java
+│       │   │   │
+│       │   │   ├── model/
+│       │   │   │   ├── entity/
+│       │   │   │   │   ├── User.java                    # id, nickname, uniqueTag(如#138992), email, passwordHash, gold, points, unlockedCharacters(已解锁人物ID列表,逗号分隔), createdAt
+│       │   │   │   │   ├── Card.java                    # id, name, health(血量), attack(攻击力), bloodCost(血献祭数), boneCost(骨头献祭数), sigils(印记列表), races(种族列表), maxDeckCount(牌组最大数量), isLegendary(是否传奇), canShuffle(是否进入洗牌堆), canSacrifice(是否可被献祭,铃铛/堤坝/破碎蛋为false), price, description, imageUrl
+│       │   │   │   │   ├── Character.java               # id, name, maxHp, deckSize(10-30), specialAbilityDesc(特殊能力描述), initialItems(初始道具,逗号分隔), isDefault(是否默认免费), price(解锁价格), imageUrl
+│       │   │   │   │   ├── PlayerCard.java              # id, userId, cardId, quantity (玩家拥有的卡牌)
+│       │   │   │   │   ├── Deck.java                    # id, userId, characterId, name
+│       │   │   │   │   ├── DeckCard.java                # id, deckId, cardId (卡组内卡牌)
+│       │   │   │   │   ├── ShopItem.java                # id, cardId, price, stock, refreshTime
+│       │   │   │   │   ├── BattleRecord.java            # id, userId, opponentId, mode(PVP/PVE), result, selfCharacterId, opponentCharacterId, selfDeckSnapshot(JSON), opponentDeckSnapshot(JSON), turns, reward, createdAt
+│       │   │   │   │   ├── Level.java                   # id, name, description, difficulty, rewardMultiplier (PvE关卡)
+│       │   │   │   │   ├── GameSession.java             # id, mode(PVP/PVE), levelId(PvE关卡), playerUserId, opponentUserId, turnNumber, cardsPlayedThisTurn(本回合已出牌数), currentPlayer, boardState(双方各4格位), playerHand, opponentHand, playerDrawPile, opponentDrawPile, playerBones, opponentBones, playerBloodThisTurn(本回合临时血), playerItems(道具栏,最多2个), opponentItems, guaranteedBloodCardDrawn(初始抽牌保底1费血献祭卡是否已触发), turnTimer, sessionStatus
+│       │   │   │   │   ├── Friend.java                  # id, userId, friendUserId, createdAt
+│       │   │   │   │   ├── FriendMessage.java           # id, fromUserId, toUserId, content, createdAt
+│       │   │   │   │   └── CardUsageStat.java           # id, userId, cardId, deckAppearCount, deckTotalCount, pvpWinCount, pvpTotalCount
+│       │   │   │   │
+│       │   │   │   ├── dto/
+│       │   │   │   │   ├── request/
+│       │   │   │   │   │   ├── RegisterRequest.java     # email, verificationCode, password, nickname
+│       │   │   │   │   │   ├── SendCodeRequest.java     # email
+│       │   │   │   │   │   ├── LoginRequest.java        # email, password
+│       │   │   │   │   │   ├── CreateDeckRequest.java   # name, characterId
+│       │   │   │   │   │   ├── AddCardToDeckRequest.java  # deckId, cardId
+│       │   │   │   │   │   ├── RemoveCardFromDeckRequest.java  # deckId, cardId
+│       │   │   │   │   │   ├── BuyCardRequest.java      # shopItemId, quantity
+│       │   │   │   │   │   ├── SelectCharacterRequest.java  # characterId
+│       │   │   │   │   │   ├── StartBattleRequest.java  # deckId, mode(PVE)
+│       │   │   │   │   │   ├── DrawCardRequest.java     # sessionId, drawType(SQUIRREL/DECK)
+│       │   │   │   │   │   ├── SelectCardRequest.java   # sessionId, handCardIndex (选牌准备打出)
+│       │   │   │   │   │   ├── SacrificeRequest.java    # sessionId, sacrificeCardIds[] (己方场上卡牌献祭)
+│       │   │   │   │   │   ├── PlayCardRequest.java     # sessionId, handCardIndex, slotIndex (己方空位0-3)
+│       │   │   │   │   │   ├── UseActiveSkillRequest.java  # sessionId
+│       │   │   │   │   │   ├── UseItemRequest.java      # sessionId, itemIndex (道具0或1)
+│       │   │   │   │   │   ├── EndTurnRequest.java      # sessionId
+│       │   │   │   │   │   ├── SurrenderRequest.java    # sessionId
+│       │   │   │   │   │   ├── StartMatchRequest.java   # deckId (PvP匹配)
+│       │   │   │   │   │   ├── AddFriendRequest.java    # targetId (用户唯一标识)
+│       │   │   │   │   │   ├── SendMessageRequest.java  # friendUserId, content
+│       │   │   │   │   │   └── InviteBattleRequest.java # friendUserId, deckId
+│       │   │   │   │   └── response/
+│       │   │   │   │       ├── RegisterResponse.java    # success, message
+│       │   │   │   │       ├── LoginResponse.java       # token, nickname, uniqueTag, gold, points
+│       │   │   │   │       ├── CardDetailResponse.java  # 卡牌完整信息（含印记、种族、献祭类型）
+│       │   │   │   │       ├── CharacterDetailResponse.java  # 人物详情（血量、卡组数、技能）
+│       │   │   │   │       ├── DeckDetailResponse.java  # 卡组详情（含校验状态）
+│       │   │   │   │       ├── ShopResponse.java        # 商品列表
+│       │   │   │   │       ├── BattleStartResponse.java # sessionId, 初始手牌(5张), 敌方信息, 先后手
+│       │   │   │   │       ├── BoardStateResponse.java  # 双方各4格位卡牌状态、手牌、骨头数、回合数
+│       │   │   │   │       ├── DrawResultResponse.java  # 抽到的卡牌信息
+│       │   │   │   │       ├── PlayCardResultResponse.java  # 出牌结果（含献祭动画数据）
+│       │   │   │   │       ├── TurnEndResponse.java     # 回合结束结算（攻击动画、伤害、死亡）
+│       │   │   │   │       ├── BattleEndResponse.java   # 胜负、积分变化、金币奖励
+│       │   │   │   │       ├── MatchResultResponse.java # PvP匹配结果（对手信息）
+│       │   │   │   │       ├── BattleRecordResponse.java  # 单条对战记录
+│       │   │   │   │       ├── CardStatResponse.java    # 卡牌使用率占比、PvP胜率(百分比两位小数)
+│       │   │   │   │       ├── FriendInfoResponse.java  # 好友信息（含卡牌数据、对战记录）
+│       │   │   │   │       └── LeaderboardResponse.java # 积分排名
+│       │   │   │   │
+│       │   │   │   └── enums/
+│       │   │   │       ├── Sigil.java                   # 所有印记枚举（空袭、高跳、幼雏、蜜蜂、移动、双重打击、掘骨、推动、分散打击、生生不息、不死、三分打击、优质祭品、剧毒、占位、兔子、盾、蚁后、挖掘者、水袭、臭臭、断尾、随机、丰产、下蛋、道具、继承、骨王、拾荒、搜寻、守护者、堤坝、铃铛、长老、反击）
+│       │   │   │       ├── Race.java                    # 种族枚举
+│       │   │   │       ├── BattleMode.java              # PVE, PVP
+│       │   │   │       ├── BattleResult.java            # WIN, LOSE, SURRENDER
+│       │   │   │       ├── SessionStatus.java           # WAITING, IN_PROGRESS, FINISHED
+│       │   │   │       ├── TurnPhase.java               # DRAW, SELECT_CARD, SACRIFICE, PLAY_CARD, END_TURN, AUTO_ATTACK
+│       │   │   │       ├── ItemType.java                # 道具枚举（画笔/剪刀/鱼钩/扇子）
+│       │   │   │       ├── DrawType.java                # SQUIRREL, DECK
+│       │   │   │       └── SacrificeType.java           # BLOOD, BONE
+│       │   │   │
+│       │   │   ├── dao/
+│       │   │   │   ├── UserDao.java                     # User 数据访问（含按uniqueTag查找）
+│       │   │   │   ├── CardDao.java                     # Card 数据访问
+│       │   │   │   ├── CharacterDao.java                # Character 数据访问
+│       │   │   │   ├── PlayerCardDao.java               # PlayerCard 数据访问
+│       │   │   │   ├── DeckDao.java                     # Deck 数据访问
+│       │   │   │   ├── DeckCardDao.java                 # DeckCard 数据访问
+│       │   │   │   ├── ShopItemDao.java                 # ShopItem 数据访问
+│       │   │   │   ├── LevelDao.java                   # Level 数据访问
+│       │   │   │   ├── BattleRecordDao.java             # BattleRecord 数据访问（按userId最近20场）
+│       │   │   │   ├── FriendDao.java                   # Friend 数据访问
+│       │   │   │   ├── FriendMessageDao.java            # FriendMessage 数据访问
+│       │   │   │   └── CardUsageStatDao.java            # CardUsageStat 数据访问
+│       │   │   │
+│       │   │   ├── websocket/
+│       │   │   │   ├── BattleWebSocketHandler.java      # PvP对战WebSocket消息处理
+│       │   │   │   ├── ChatWebSocketHandler.java        # 好友私信WebSocket消息处理
+│       │   │   │   └── MatchWebSocketHandler.java       # PvP匹配等待WebSocket处理
+│       │   │   │
+│       │   │   ├── exception/
+│       │   │   │   ├── GlobalExceptionHandler.java
+│       │   │   │   ├── BusinessException.java
+│       │   │   │   ├── InsufficientGoldException.java
+│       │   │   │   ├── DeckValidationException.java     # 卡组校验失败（数量不符、传奇>3、重复超限）
+│       │   │   │   ├── InvalidBattleActionException.java  # 非法战斗操作（献祭数不匹配、非己方回合等）
+│       │   │   │   ├── TurnTimeoutException.java        # PvP回合超时
+│       │   │   │   └── MatchUnavailableException.java   # 无法匹配（无在线对手）
+│       │   │   │
+│       │   │   └── util/
+│       │   │       ├── JwtUtil.java
+│       │   │       ├── IdGenerator.java                 # 生成用户唯一标识（6位随机数，保证唯一）
+│       │   │       └── GameConstants.java               # 格子数4、初始抽牌5、松鼠无限、PvP回合时限30秒、传奇上限3、道具上限2、最近记录20场等
+│       │   │
+│       │   └── resources/
+│       │       ├── application.yml
+│       │       ├── application-dev.yml
+│       │       ├── application-prod.yml
+│       │       ├── data.sql                             # 初始卡牌数据seed（含印记、种族、献祭类型）
+│       │       └── character.sql                        # 初始人物数据seed
+│       │
+│       └── test/
+│           └── java/com/cardgame/
+│               ├── service/
+│               │   ├── AuthServiceTest.java             # 注册/邮箱验证码/登录/Token
+│               │   ├── DeckServiceTest.java             # 卡组校验（数量匹配人物、传奇≤3、重复上限、maxDeckCount限制）
+│               │   ├── ShopServiceTest.java             # 购买/余额不足/库存
+│               │   ├── BattleServiceTest.java           # 战斗流程（开局抽牌、先后手、胜负判定）
+│               │   ├── SacrificeServiceTest.java        # 献祭规则（血献祭精确匹配、骨头扣除、不可献祭卡牌）
+│               │   ├── TurnServiceTest.java             # 回合流程（抽牌→选牌→献祭→出牌→结算连贯性）
+│               │   ├── CardLogicServiceTest.java        # 印记效果（空袭、双重打击、幼雏成长、反击等）
+│               │   ├── ShuffleServiceTest.java          # 洗牌逻辑（永久死亡卡牌排除、牌组空时重洗）
+│               │   ├── MatchServiceTest.java            # PvP匹配逻辑
+│               │   ├── PvpBattleServiceTest.java        # PvP对战（30秒超时强制结束、未完成操作回退）
+│               │   ├── FriendServiceTest.java           # 好友搜索/添加/删除/私信
+│               │   ├── StatisticsServiceTest.java       # 卡牌使用率、PvP胜率计算精度
+│               │   └── AIServiceTest.java               # AI决策合理性
+│               └── controller/
+│                   ├── AuthControllerTest.java
+│                   ├── BattleControllerTest.java
+│                   ├── PvpControllerTest.java
+│                   └── FriendControllerTest.java
+│
+├── frontend/
+│   ├── package.json
+│   ├── vite.config.js
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   ├── index.html
+│   └── src/
+│       ├── main.js
+│       ├── App.vue
+│       ├── router/
+│       │   └── index.js                                # 路由(含登录守卫)
+│       ├── store/
+│       │   ├── index.js
+│       │   ├── user.js                                 # 登录态、金币、积分、uniqueTag
+│       │   ├── card.js                                 # 卡牌收藏（含印记、种族信息）
+│       │   ├── character.js                            # 人物列表与选中状态
+│       │   ├── deck.js                                 # 卡组数据与校验状态
+│       │   ├── shop.js                                 # 商店数据
+│       │   ├── battle.js                               # 战斗状态（棋盘、手牌、骨头、血、回合阶段）
+│       │   ├── pvp.js                                  # PvP匹配与对战状态
+│       │   ├── friend.js                               # 好友列表、私信、对局邀请
+│       │   └── record.js                               # 对战记录（最近20场）
+│       ├── api/
+│       │   ├── request.js                              # Axios实例(拦截器/Token)
+│       │   ├── auth.js                                 # 注册/验证码/登录
+│       │   ├── player.js                               # 玩家信息/积分/排名
+│       │   ├── card.js                                 # 卡牌查询
+│       │   ├── character.js                            # 人物查询
+│       │   ├── deck.js                                 # 卡组增删改
+│       │   ├── shop.js                                 # 商店
+│       │   ├── battle.js                               # 人机对战
+│       │   ├── pvp.js                                  # PvP对战
+│       │   ├── friend.js                               # 好友管理
+│       │   ├── record.js                               # 对战记录
+│       │   └── statistics.js                           # 卡牌统计
+│       ├── websocket/
+│       │   ├── battleSocket.js                         # PvP对战WebSocket封装
+│       │   ├── chatSocket.js                           # 好友私信WebSocket封装
+│       │   └── matchSocket.js                          # 匹配等待WebSocket封装
+│       ├── views/
+│       │   ├── LoginView.vue                           # 邮箱登录+注册（含验证码输入）
+│       │   ├── HomeView.vue                            # 大厅（入口导航、积分排名展示）
+│       │   ├── CollectionView.vue                      # 我的卡牌收藏（含印记/种族筛选）
+│       │   ├── CharacterSelectView.vue                 # 人物选择（血量、卡组数、技能展示）
+│       │   ├── DeckBuilderView.vue                     # 卡组编辑（选卡、实时校验：数量/传奇/重复）
+│       │   ├── ShopView.vue                            # 商店浏览与购买
+│       │   ├── BattlePrepareView.vue                   # 对战前准备（选人物→组建卡组→选关卡→进入游戏）
+│       │   ├── LevelSelectView.vue                     # PvE关卡选择列表
+│       │   ├── BattleView.vue                          # 人机战斗主界面
+│       │   ├── PvpBattleView.vue                       # PvP战斗主界面（含30秒回合倒计时）
+│       │   ├── MatchView.vue                           # PvP匹配等待界面
+│       │   ├── BattleResultView.vue                    # 结算（积分变化、金币奖励）
+│       │   ├── RecordView.vue                          # 对战记录（最近20场、双方人物与卡组）
+│       │   ├── StatisticsView.vue                      # 卡牌使用率占比、PvP胜率
+│       │   ├── FriendListView.vue                      # 好友列表（搜索ID、查看数据、私信、邀请对局）
+│       │   └── ChatView.vue                            # 好友私信聊天界面
+│       ├── components/
+│       │   ├── auth/
+│       │   │   ├── LoginForm.vue                       # 邮箱+密码登录
+│       │   │   └── RegisterForm.vue                    # 邮箱注册（发送验证码→输入密码→完成）
+│       │   ├── card/
+│       │   │   ├── CardItem.vue                        # 单卡渲染（血量/攻击力/献祭数/印记/种族）
+│       │   │   ├── CardDetail.vue                      # 卡牌详情弹窗（完整属性展示）
+│       │   │   └── CardGrid.vue                        # 卡牌网格（收藏/商店通用）
+│       │   ├── character/
+│       │   │   ├── CharacterCard.vue                   # 人物卡片（血量、卡组数、技能）
+│       │   │   └── CharacterDetail.vue                 # 人物详情弹窗
+│       │   ├── deck/
+│       │   │   ├── DeckList.vue                        # 卡组列表
+│       │   │   ├── DeckEditor.vue                      # 卡组编辑区（含实时校验提示）
+│       │   │   ├── DeckSlot.vue                        # 卡组内卡位
+│       │   │   └── DeckValidator.vue                   # 卡组校验结果展示（数量/传奇/重复）
+│       │   ├── shop/
+│       │   │   ├── ShopGrid.vue                        # 商品展示
+│       │   │   ├── ShopCard.vue                        # 商品卡(价格/购买按钮)
+│       │   │   └── BuyConfirm.vue                      # 购买确认弹窗
+│       │   ├── battle/
+│       │   │   ├── BattleBoard.vue                     # 战场总览（双方各4格位相对布局）
+│       │   │   ├── PlayerField.vue                     # 玩家战场侧（4个格位）
+│       │   │   ├── EnemyField.vue                      # 敌方战场侧（4个格位）
+│       │   │   ├── BoardSlot.vue                       # 单个格位（卡牌/空位/骨头）
+│       │   │   ├── HandArea.vue                        # 手牌区（点击选牌）
+│       │   │   ├── SacrificePanel.vue                  # 献祭选择面板（血献祭选己方卡/骨头献祭扣除）
+│       │   │   ├── TurnPhaseBar.vue                    # 回合阶段指示（抽牌→选牌→献祭→出牌→结束）
+│       │   │   ├── TurnResolve.vue                     # 回合结算动画（攻击、伤害、死亡）
+│       │   │   ├── BoneDisplay.vue                     # 骨头数量显示
+│       │   │   ├── BattleLog.vue                       # 战斗文字日志
+│       │   │   ├── HealthBar.vue                       # 双方人物血量条
+│       │   │   ├── TurnTimer.vue                       # PvP回合30秒倒计时
+│       │   │   ├── ActiveSkillButton.vue               # 主动技能按钮
+│       │   │   ├── ItemSlot.vue                        # 道具栏（最多2个）
+│       │   │   ├── SurrenderButton.vue                 # 投降按钮
+│       │   │   └── DrawChoice.vue                      # 抽牌选择（松鼠/牌组牌）
+│       │   ├── friend/
+│       │   │   ├── FriendSearch.vue                    # 搜索好友（ID搜索/对战中申请）
+│       │   │   ├── FriendCard.vue                      # 好友卡片（头像/昵称/在线状态）
+│       │   │   ├── FriendDetail.vue                    # 好友详情（卡牌数据、对战记录）
+│       │   │   ├── ChatWindow.vue                      # 私信聊天窗口
+│       │   │   └── InviteDialog.vue                    # 发起对局邀请弹窗
+│       │   ├── match/
+│       │   │   ├── MatchWaiting.vue                    # 匹配等待动画
+│       │   │   └── MatchFound.vue                      # 匹配成功展示
+│       │   ├── record/
+│       │   │   ├── RecordList.vue                      # 对战记录列表
+│       │   │   └── RecordDetail.vue                    # 单条记录详情（双方人物、卡组）
+│       │   ├── statistics/
+│       │   │   ├── CardStatTable.vue                   # 卡牌使用率表格（占比+胜率）
+│       │   │   └── CardStatChart.vue                   # 卡牌统计图表
+│       │   └── common/
+│       │       ├── NavBar.vue                          # 顶部导航（昵称#ID/金币/积分）
+│       │       ├── GoldDisplay.vue                     # 金币显示
+│       │       ├── PointsDisplay.vue                   # 积分显示
+│       │       ├── LoadingSpinner.vue
+│       │       └── ConfirmDialog.vue
+│       ├── assets/
+│       │   ├── styles/
+│       │   │   ├── main.scss                           # 全局样式
+│       │   │   ├── variables.scss                      # 暗黑主题变量
+│       │   │   ├── card.scss                           # 卡牌样式（含印记图标）
+│       │   │   ├── battle.scss                         # 战斗界面样式（4格位布局）
+│       │   │   └── board.scss                          # 棋盘格位样式
+│       │   └── images/                                 # 卡牌图/背景图/印记图标/人物图
+│       └── utils/
+│           ├── constants.js                            # 前端常量（格子数、手牌上限等）
+│           └── helpers.js
+│
+├── docker-compose.yml
+├── .gitignore
+├── .github/
+│   └── workflows/
+│       └── ci.yml                                      # 含 unit-test job
+├── Makefile
+└── README.md

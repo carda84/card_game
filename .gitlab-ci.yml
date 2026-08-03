@@ -1,0 +1,66 @@
+# CI 配置 — 野兽牌
+# 必须包含一个名为 unit-test 的 job
+
+stages:
+  - test
+  - build
+
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+
+# ===== 单元测试（必做 job）=====
+unit-test:
+  stage: test
+  image: maven:3.9-eclipse-temurin-21
+  services:
+    - name: mysql:8.0
+      alias: mysql
+      variables:
+        MYSQL_ROOT_PASSWORD: ci-test-password
+        MYSQL_DATABASE: cardgame_test
+  variables:
+    DB_URL: "jdbc:mysql://mysql:3306/cardgame_test?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8"
+    DB_USERNAME: root
+    DB_PASSWORD: ci-test-password
+    JWT_SECRET: ci-test-secret-key-at-least-32-chars-long
+    MAIL_USERNAME: test@example.com
+    MAIL_PASSWORD: test
+  before_script:
+    - cd card/backend
+  script:
+    - mvn test -B
+  cache:
+    key: maven-cache
+    paths:
+      - .m2/repository
+
+# ===== 前端构建验证 =====
+frontend-build:
+  stage: test
+  image: node:20-alpine
+  before_script:
+    - cd card/frontend
+  script:
+    - npm ci
+    - npm run build
+  cache:
+    key: npm-cache
+    paths:
+      - card/frontend/node_modules
+
+# ===== Docker 镜像构建 =====
+docker-build:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  variables:
+    DB_PASSWORD: ci-test-password
+    JWT_SECRET: ci-test-secret-key-at-least-32-chars-long
+    MAIL_USERNAME: test@example.com
+    MAIL_PASSWORD: test
+  script:
+    - docker-compose build
+  needs:
+    - unit-test
+    - frontend-build
