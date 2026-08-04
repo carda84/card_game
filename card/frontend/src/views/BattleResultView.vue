@@ -95,7 +95,7 @@ onMounted(() => {
 <style scoped>
 .result-page {
   min-height: 100vh;
-  background: #1a1a2e;
+  background: transparent;
   position: relative;
   overflow: hidden;
   padding: 2rem;

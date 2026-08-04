@@ -47,7 +47,7 @@
       </aside>
 
       <!-- 中央：牌桌 -->
-      <main class="board-area">
+      <main class="board-area" :style="{ backgroundImage: `url(${deskImg})` }">
         <!-- 回合信息 -->
         <div class="turn-bar">
           <span>回合 {{ battleStore.turnNumber }}</span>
@@ -303,10 +303,11 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useBattleStore } from '../store/battle'
 import CardImageModal from '../components/card/CardImageModal.vue'
 import { getCardImage } from '../utils/cardImages'
+import deskImg from '../assets/images/desk.jpg'
 
 const route = useRoute()
 const router = useRouter()
@@ -576,13 +577,50 @@ watch(() => battleStore.lastAttacks, (arr) => {
 
 onUnmounted(() => {
   battleStore.stopPolling()
+  window.removeEventListener('beforeunload', handleBeforeUnload)
 })
+
+// PvP 模式：离开页面自动投降
+function autoSurrenderOnLeave() {
+  if (
+    battleStore.mode === 'PVP' &&
+    battleStore.sessionId &&
+    !battleStore.gameOver
+  ) {
+    // 使用 navigator.sendBeacon 确保在页面卸载时仍能发出请求
+    const token = localStorage.getItem('token') || ''
+    const url = '/api/battle/surrender'
+    const body = JSON.stringify({ sessionId: battleStore.sessionId })
+    // 使用 fetch + keepalive 确保在页面卸载时仍能发出请求
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: body,
+      keepalive: true
+    }).catch(() => {})
+  }
+}
+
+// 路由内导航离开（点击链接、router.push 等）
+onBeforeRouteLeave((to, from, next) => {
+  autoSurrenderOnLeave()
+  next()
+})
+
+// 页面关闭 / 刷新 / 跳转其他网站
+window.addEventListener('beforeunload', handleBeforeUnload)
+function handleBeforeUnload() {
+  autoSurrenderOnLeave()
+}
 </script>
 
 <style scoped>
 .battle-view {
   min-height: 100vh;
-  background: #1a1a2e;
+  background: transparent;
   position: relative;
   overflow-x: hidden;
   padding: 16px;
@@ -590,7 +628,7 @@ onUnmounted(() => {
   flex-direction: column;
 }
 
-.bg-decor { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+.bg-decor { position: fixed; inset: 0; pointer-events: none; z-index: 0; display: none; }
 .bg-icon { position: absolute; font-size: 6rem; opacity: 0.04; animation: float 20s ease-in-out infinite; }
 .bg-icon.i1 { top: 8%; left: 5%; }
 .bg-icon.i2 { top: 20%; right: 8%; animation-delay: -6s; }
@@ -633,11 +671,11 @@ onUnmounted(() => {
 }
 
 .side-panel {
-  background: rgba(22, 33, 62, 0.85);
-  border: 1px solid #0f3460;
+  background: rgba(22, 33, 62, 0.7);
+  border: 1px solid rgba(255, 215, 0, 0.15);
   border-radius: 12px;
   padding: 14px;
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(8px);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -711,13 +749,33 @@ onUnmounted(() => {
 }
 
 .board-area {
-  background: linear-gradient(180deg, rgba(22,33,62,0.6) 0%, rgba(13,27,42,0.8) 100%);
-  border: 1px solid #0f3460;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: 2px solid rgba(255, 215, 0, 0.3);
   border-radius: 16px;
   padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 牌桌图片上的暗色遮罩，让卡牌更突出 */
+.board-area::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 14px;
+  pointer-events: none;
+}
+
+/* 牌桌内容层 */
+.board-area > * {
+  position: relative;
+  z-index: 1;
 }
 .turn-bar {
   display: flex;
@@ -749,8 +807,8 @@ onUnmounted(() => {
 }
 .slot {
   aspect-ratio: 3 / 4;
-  background: #0d1b2a;
-  border: 2px dashed #0f3460;
+  background: rgba(13, 27, 42, 0.5);
+  border: 2px dashed rgba(255, 215, 0, 0.3);
   border-radius: 10px;
   position: relative;
   overflow: hidden;
@@ -758,10 +816,12 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  backdrop-filter: blur(2px);
 }
 .slot.filled {
   border-style: solid;
-  border-color: #2a5a3a;
+  border-color: rgba(42, 90, 58, 0.8);
+  background: rgba(13, 27, 42, 0.3);
 }
 .slot.player-slot.empty.can-play {
   border-color: #ffd700;
@@ -836,7 +896,7 @@ onUnmounted(() => {
 
 .board-divider {
   height: 4px;
-  background: linear-gradient(90deg, transparent, #e94560, transparent);
+  background: linear-gradient(90deg, transparent, rgba(233, 69, 96, 0.6), transparent);
   border-radius: 2px;
   position: relative;
   margin: 4px 0;
@@ -891,10 +951,11 @@ onUnmounted(() => {
   max-width: 1400px;
   margin: 14px auto 0;
   width: 100%;
-  background: rgba(22, 33, 62, 0.9);
-  border: 1px solid #0f3460;
+  background: rgba(22, 33, 62, 0.75);
+  border: 1px solid rgba(255, 215, 0, 0.15);
   border-radius: 12px;
   padding: 10px 14px;
+  backdrop-filter: blur(8px);
 }
 .hand-title {
   color: #ffd700;

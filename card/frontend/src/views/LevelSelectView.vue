@@ -81,7 +81,7 @@ function startLevel(level) {
 </script>
 
 <style scoped>
-.level-select-page { min-height: 100vh; background: #1a1a2e; }
+.level-select-page { min-height: 100vh; background: transparent; }
 .main-content { padding: 2rem; max-width: 760px; margin: 0 auto; }
 .center-wrap h2 { color: #e0e0e0; margin-bottom: 6px; }
 .subtitle { color: #888; margin-bottom: 20px; }

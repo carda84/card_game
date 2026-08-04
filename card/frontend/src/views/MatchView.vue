@@ -1,6 +1,6 @@
 <template>
   <div class="match-page">
-    <Nav🏆ar />
+    <NavBar />
     <main class="main-content">
       <div class="bg-decor">
         <span class="bg-icon i1">⚔️</span>
@@ -31,10 +31,25 @@
         </div>
 
         <div v-else class="waiting-card">
-          <div class="spinner"></div>
+          <!-- 旋转图案 -->
+          <div class="orbit-container">
+            <div class="orbit-ring">
+              <span class="orbit-dot d1"></span>
+              <span class="orbit-dot d2"></span>
+              <span class="orbit-dot d3"></span>
+              <span class="orbit-dot d4"></span>
+            </div>
+            <span class="orbit-center">⚔️</span>
+          </div>
+
           <h3>正在寻找对手...</h3>
-          <p class="hint">请保持页面开启</p>
-          <button class="btn btn-danger" @click="pvpStore.cancelQueue()">取消匹配</button>
+          <p class="wait-time">已等待 <span class="time-num">{{ formatTime(elapsedSeconds) }}</span></p>
+          <p class="hint">请保持页面开启，匹配成功后将自动进入对战</p>
+
+          <div class="wait-actions">
+            <button class="btn btn-ghost" @click="exitMatch">🏠 返回首页</button>
+            <button class="btn btn-danger" @click="pvpStore.cancelQueue()">✖ 取消匹配</button>
+          </div>
         </div>
       </div>
     </main>
@@ -53,18 +68,48 @@ const deckStore = useDeckStore()
 const router = useRouter()
 
 const selectedDeckId = ref(null)
+const elapsedSeconds = ref(0)
 let pollTimer = null
+let tickTimer = null
+
+function startTick() {
+  elapsedSeconds.value = 0
+  tickTimer = setInterval(() => { elapsedSeconds.value++ }, 1000)
+}
+function stopTick() {
+  if (tickTimer) { clearInterval(tickTimer); tickTimer = null }
+  elapsedSeconds.value = 0
+}
+function formatTime(s) {
+  const m = String(Math.floor(s / 60)).padStart(2, '0')
+  const sec = String(s % 60).padStart(2, '0')
+  return `${m}:${sec}`
+}
+
+function exitMatch() {
+  pvpStore.cancelQueue()
+  stopPoll()
+  stopTick()
+  router.push('/')
+}
 
 onMounted(async () => {
   await deckStore.fetchDecks()
   if (deckStore.decks.length) {
     selectedDeckId.value = deckStore.decks[0].id
   }
+  // 如果进入页面时已在队列中（刷新恢复），启动计时
+  if (pvpStore.inQueue) { startTick(); startPoll() }
+})
+
+watch(() => pvpStore.inQueue, (inQ) => {
+  if (inQ) { startTick() } else { stopTick() }
 })
 
 watch(() => pvpStore.matchResult, (res) => {
   if (res && res.matched) {
     stopPoll()
+    stopTick()
     router.push({
       name: 'Battle',
       query: {
@@ -97,17 +142,18 @@ function stopPoll() {
 
 onUnmounted(() => {
   stopPoll()
+  stopTick()
 })
 </script>
 
 <style scoped>
 .match-page {
   min-height: 100vh;
-  background: #1a1a2e;
+  background: transparent;
   position: relative;
   overflow: hidden;
 }
-.bg-decor { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+.bg-decor { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
 .bg-icon { position: absolute; font-size: 6rem; opacity: 0.05; animation: float 18s ease-in-out infinite; }
 .bg-icon.i1 { top: 10%; left: 8%; }
 .bg-icon.i2 { top: 30%; right: 12%; animation-delay: -6s; }
@@ -116,7 +162,7 @@ onUnmounted(() => {
 
 .main-content {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   min-height: calc(100vh - 56px);
   display: flex;
   align-items: center;
@@ -132,11 +178,13 @@ onUnmounted(() => {
 .subtitle { color: #888; margin-bottom: 24px; }
 
 .prepare-card, .waiting-card {
-  background: #16213e;
-  border: 1px solid #0f3460;
+  background: rgba(22, 33, 62, 0.95);
+  border: 1px solid rgba(15, 52, 96, 0.8);
   border-radius: 12px;
   padding: 24px;
   text-align: left;
+  position: relative;
+  z-index: 3;
 }
 .hint { color: #888; font-size: 0.88rem; margin-bottom: 12px; }
 .deck-select {
@@ -154,18 +202,72 @@ onUnmounted(() => {
   gap: 10px;
   justify-content: flex-end;
 }
-.spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid #0f3460;
-  border-top-color: #e94560;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 16px;
+/* ===== 旋转轨道图案 ===== */
+.orbit-container {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 20px;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+.orbit-ring {
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgba(255, 215, 0, 0.25);
+  border-radius: 50%;
+  animation: orbit-spin 2.4s linear infinite;
+}
+.orbit-dot {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #e94560;
+  box-shadow: 0 0 8px rgba(233,69,96,0.7);
+}
+.orbit-dot.d1 { top: -7px;  left: calc(50% - 7px); }
+.orbit-dot.d2 { bottom: -7px; left: calc(50% - 7px); background: #ffd700; box-shadow: 0 0 8px rgba(255,215,0,0.7); }
+.orbit-dot.d3 { left: -7px;  top: calc(50% - 7px); background: #4fc3f7; box-shadow: 0 0 8px rgba(79,195,247,0.7); }
+.orbit-dot.d4 { right: -7px; top: calc(50% - 7px); background: #81c784; box-shadow: 0 0 8px rgba(129,199,132,0.7); }
+.orbit-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  animation: pulse-glow 1.6s ease-in-out infinite;
+}
+@keyframes orbit-spin { to { transform: rotate(360deg); } }
+@keyframes pulse-glow {
+  0%,100% { transform: scale(1); opacity: 1; }
+  50%       { transform: scale(1.15); opacity: 0.75; }
+}
+
+/* ===== 等待时间 ===== */
+.wait-time {
+  color: #888;
+  font-size: 1rem;
+  margin: 8px 0 4px;
+}
+.time-num {
+  color: #ffd700;
+  font-size: 1.6rem;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 2px;
+}
+
+/* ===== 操作按钮 ===== */
+.wait-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 20px;
+}
+.wait-actions .btn { flex: 1; max-width: 160px; }
+
 .waiting-card { text-align: center; }
-.waiting-card h3 { color: #ffd700; }
+.waiting-card h3 { color: #ffd700; margin-top: 4px; }
 
 .btn {
   padding: 10px 20px;

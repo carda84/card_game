@@ -65,17 +65,32 @@ export const useBattleStore = defineStore('battle', () => {
     if (!sessionId.value) return
     try {
       board.value = await battleApi.getBoardState(sessionId.value)
-      // 检查是否游戏结束（后端返回的 HP 为 0 或以下时视为结束）
-      if (board.value.playerHp <= 0 || board.value.opponentHp <= 0) {
+
+      // 检查是否游戏结束（优先用后端返回的 gameOver，兑底用血量判断）
+      const serverOver = board.value.gameOver === true
+      const hpOver = board.value.playerHp <= 0 || board.value.opponentHp <= 0
+
+      if (serverOver || hpOver) {
         gameOver.value = true
         stopPolling()
         if (!result.value) {
-          const iWon = board.value.opponentHp <= 0
-          result.value = {
-            result: iWon ? 'WIN' : 'LOSE',
-            turns: board.value.turnNumber || 0,
-            goldReward: iWon ? 100 : 30,
-            pointsChange: iWon ? 10 : -5
+          if (serverOver && board.value.winner) {
+            // 后端已提供结算信息
+            result.value = {
+              result: board.value.winner === 'PLAYER' ? 'WIN' : 'LOSE',
+              turns: board.value.turnNumber || 0,
+              goldReward: board.value.goldReward ?? (board.value.winner === 'PLAYER' ? 100 : 30),
+              pointsChange: board.value.pointsChange ?? (board.value.winner === 'PLAYER' ? 10 : -5)
+            }
+          } else {
+            // 兑底：用血量判断
+            const iWon = board.value.opponentHp <= 0
+            result.value = {
+              result: iWon ? 'WIN' : 'LOSE',
+              turns: board.value.turnNumber || 0,
+              goldReward: iWon ? 100 : 30,
+              pointsChange: iWon ? 10 : -5
+            }
           }
         }
       }

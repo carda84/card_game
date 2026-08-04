@@ -49,7 +49,7 @@ import NavBar from '../components/common/NavBar.vue'
 <style scoped>
 .home-view {
   min-height: 100vh;
-  background: #1a1a2e;
+  background: transparent;
   color: #e0e0e0;
 }
 .main-content {

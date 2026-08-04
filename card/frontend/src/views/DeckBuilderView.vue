@@ -387,8 +387,8 @@ async function doDeleteDeck() {
 </script>
 
 <style scoped>
-.deck-page { min-height: 100vh; background: #1a1a2e; }
-.main-content { position: relative; min-height: calc(100vh - 56px); }
+.deck-page { min-height: 100vh; background: transparent; }
+.main-content { position: relative; min-height: calc(100vh - 56px); z-index: 1; }
 .bg-decor { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
 .bg-icon { position: absolute; font-size: 7rem; opacity: 0.04; animation: float 20s ease-in-out infinite; }
 .bg-icon.i1 { top: 15%; left: 10%; }

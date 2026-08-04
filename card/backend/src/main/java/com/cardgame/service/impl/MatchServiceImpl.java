@@ -28,6 +28,12 @@ public class MatchServiceImpl implements MatchService {
     /** 匹配队列：userId -> deckId */
     private final Map<Long, Long> matchQueue = new ConcurrentHashMap<>();
 
+    /** 等待对手拾取的匹配结果：opponentId -> MatchResultResponse */
+    private final Map<Long, MatchResultResponse> pendingMatchResults = new ConcurrentHashMap<>();
+
+    /** 防止并发匹配冲突 */
+    private final Object matchLock = new Object();
+
     private final UserDao userDao;
     private final DeckDao deckDao;
     private final DeckCardDao deckCardDao;
@@ -59,41 +65,83 @@ public class MatchServiceImpl implements MatchService {
     @Override
     public void leaveQueue(Long userId) {
         matchQueue.remove(userId);
+        pendingMatchResults.remove(userId);
         log.info("用户 {} 离开匹配队列", userId);
     }
 
     @Override
     @Transactional
     public MatchResultResponse findMatch(Long userId) {
-        // 找队列中的其他玩家
-        for (Map.Entry<Long, Long> entry : matchQueue.entrySet()) {
-            Long opponentId = entry.getKey();
-            if (opponentId.equals(userId)) continue;
-
-            Long opponentDeckId = entry.getValue();
-            Long myDeckId = matchQueue.get(userId);
-
-            // 匹配成功！移除双方
-            matchQueue.remove(userId);
-            matchQueue.remove(opponentId);
-
-            // 创建 PvP 对战会话
-            GameSession session = createPvpSession(userId, myDeckId, opponentId, opponentDeckId);
-
-            User opponent = userDao.findById(opponentId).orElse(null);
-            com.cardgame.model.entity.Character oppChar = characterDao.findById(session.getOpponentCharacterId()).orElse(null);
-
-            return MatchResultResponse.builder()
-                    .matched(true)
-                    .sessionId(session.getId())
-                    .opponentNickname(opponent != null ? opponent.getNickname() : "未知")
-                    .opponentUniqueTag(opponent != null ? opponent.getUniqueTag() : "000000")
-                    .opponentCharacterId(session.getOpponentCharacterId())
-                    .opponentCharacterName(oppChar != null ? oppChar.getName() : "未知")
-                    .build();
+        // 1. 检查是否有等待拾取的匹配结果（被对手匹配时存储）
+        MatchResultResponse pending = pendingMatchResults.remove(userId);
+        if (pending != null) {
+            log.info("用户 {} 拾取对手匹配的待匹配结果, sessionId={}", userId, pending.getSessionId());
+            return pending;
         }
 
-        return MatchResultResponse.builder().matched(false).build();
+        // 2. 加锁防止双方同时匹配同一人
+        Long opponentId;
+        Long opponentDeckId;
+        Long myDeckId;
+
+        synchronized (matchLock) {
+            // 再检查一次（可能在加锁期间对手已匹配了自己）
+            if (!matchQueue.containsKey(userId)) {
+                return MatchResultResponse.builder().matched(false).build();
+            }
+
+            // 找队列中的其他玩家
+            opponentId = null;
+            opponentDeckId = null;
+            for (Map.Entry<Long, Long> entry : matchQueue.entrySet()) {
+                if (!entry.getKey().equals(userId)) {
+                    opponentId = entry.getKey();
+                    opponentDeckId = entry.getValue();
+                    break;
+                }
+            }
+
+            if (opponentId == null) {
+                return MatchResultResponse.builder().matched(false).build();
+            }
+
+            myDeckId = matchQueue.get(userId);
+            // 原子移除双方
+            matchQueue.remove(userId);
+            matchQueue.remove(opponentId);
+        }
+
+        // 3. 创建 PvP 对战会话
+        GameSession session = createPvpSession(userId, myDeckId, opponentId, opponentDeckId);
+
+        User opponent = userDao.findById(opponentId).orElse(null);
+        com.cardgame.model.entity.Character oppChar = characterDao.findById(session.getOpponentCharacterId()).orElse(null);
+
+        String opponentNickname = opponent != null ? opponent.getNickname() : "未知";
+        String opponentUniqueTag = opponent != null ? opponent.getUniqueTag() : "000000";
+        String opponentCharacterName = oppChar != null ? oppChar.getName() : "未知";
+
+        // 4. 存储对手的匹配结果（对手下次轮询时拾取）
+        MatchResultResponse opponentResult = MatchResultResponse.builder()
+                .matched(true)
+                .sessionId(session.getId())
+                .opponentNickname(userDao.findById(userId).map(User::getNickname).orElse("未知"))
+                .opponentUniqueTag(userDao.findById(userId).map(User::getUniqueTag).orElse("000000"))
+                .opponentCharacterId(session.getPlayerCharacterId())
+                .opponentCharacterName(characterDao.findById(session.getPlayerCharacterId()).map(com.cardgame.model.entity.Character::getName).orElse("未知"))
+                .build();
+        pendingMatchResults.put(opponentId, opponentResult);
+
+        log.info("匹配成功: player1={}, player2={}, sessionId={}", userId, opponentId, session.getId());
+
+        return MatchResultResponse.builder()
+                .matched(true)
+                .sessionId(session.getId())
+                .opponentNickname(opponentNickname)
+                .opponentUniqueTag(opponentUniqueTag)
+                .opponentCharacterId(session.getOpponentCharacterId())
+                .opponentCharacterName(opponentCharacterName)
+                .build();
     }
 
     private GameSession createPvpSession(Long player1Id, Long deck1Id, Long player2Id, Long deck2Id) {

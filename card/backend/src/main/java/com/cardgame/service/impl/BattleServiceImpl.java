@@ -351,8 +351,14 @@ public class BattleServiceImpl implements BattleService {
             throw new BusinessException("对战已结束");
 
         session.setSessionStatus(SessionStatus.FINISHED);
+        // 投降方血量设为 0，便于轮询方检测游戏结束
+        if (isCreator) {
+            session.setPlayerHp(0);
+        } else {
+            session.setOpponentHp(0);
+        }
         // 投降方 = 当前操作者，胜利方 = 另一方
-        // settleBattle(session, isWin) 以 creator 视角计算
+        // settleBattle(session, creatorWins) 以 creator 视角计算
         boolean creatorWins = !isCreator; // creator 投降则 creator 输
         settleBattle(session, creatorWins);
         gameSessionDao.save(session);
@@ -652,30 +658,57 @@ public class BattleServiceImpl implements BattleService {
 
     // ==================== 结算 ====================
 
-    private void settleBattle(GameSession session, boolean isWin) {
-        int goldReward = isWin ? WIN_GOLD_REWARD : LOSE_GOLD_REWARD;
-        int pointsChange = isWin ? WIN_POINTS : LOSE_POINTS;
+    private void settleBattle(GameSession session, boolean creatorWins) {
+        boolean isPvp = session.getMode() == BattleMode.PVP && session.getOpponentUserId() != null;
 
-        shopService.awardGold(session.getPlayerUserId(), goldReward);
-        User user = userDao.findById(session.getPlayerUserId()).orElse(null);
-        if (user != null) {
-            user.setPoints(Math.max(0, user.getPoints() + pointsChange));
-            userDao.save(user);
+        // Creator 结算
+        int creatorGold = creatorWins ? WIN_GOLD_REWARD : LOSE_GOLD_REWARD;
+        int creatorPoints = creatorWins ? WIN_POINTS : LOSE_POINTS;
+        shopService.awardGold(session.getPlayerUserId(), creatorGold);
+        User creator = userDao.findById(session.getPlayerUserId()).orElse(null);
+        if (creator != null) {
+            creator.setPoints(Math.max(0, creator.getPoints() + creatorPoints));
+            userDao.save(creator);
         }
 
-        // 保存战斗记录
-        BattleRecord record = BattleRecord.builder()
+        // 保存 Creator 战斗记录
+        BattleRecord creatorRecord = BattleRecord.builder()
                 .userId(session.getPlayerUserId())
                 .opponentId(session.getOpponentUserId())
                 .mode(session.getMode())
-                .result(isWin ? BattleResult.WIN : BattleResult.LOSE)
+                .result(creatorWins ? BattleResult.WIN : BattleResult.LOSE)
                 .selfCharacterId(session.getPlayerCharacterId())
                 .opponentCharacterId(session.getOpponentCharacterId())
                 .turns(session.getTurnNumber())
-                .reward(goldReward)
+                .reward(creatorGold)
                 .build();
-        battleRecordDao.save(record);
-        log.info("战斗结算: sessionId={}, result={}, gold={}", session.getId(), isWin ? "WIN" : "LOSE", goldReward);
+        battleRecordDao.save(creatorRecord);
+
+        // PvP: 对手结算
+        if (isPvp) {
+            boolean opponentWins = !creatorWins;
+            int opponentGold = opponentWins ? WIN_GOLD_REWARD : LOSE_GOLD_REWARD;
+            int opponentPoints = opponentWins ? WIN_POINTS : LOSE_POINTS;
+            shopService.awardGold(session.getOpponentUserId(), opponentGold);
+            User opponent = userDao.findById(session.getOpponentUserId()).orElse(null);
+            if (opponent != null) {
+                opponent.setPoints(Math.max(0, opponent.getPoints() + opponentPoints));
+                userDao.save(opponent);
+            }
+            BattleRecord opponentRecord = BattleRecord.builder()
+                    .userId(session.getOpponentUserId())
+                    .opponentId(session.getPlayerUserId())
+                    .mode(session.getMode())
+                    .result(opponentWins ? BattleResult.WIN : BattleResult.LOSE)
+                    .selfCharacterId(session.getOpponentCharacterId())
+                    .opponentCharacterId(session.getPlayerCharacterId())
+                    .turns(session.getTurnNumber())
+                    .reward(opponentGold)
+                    .build();
+            battleRecordDao.save(opponentRecord);
+        }
+
+        log.info("战斗结算: sessionId={}, creatorWins={}, gold={}/{}", session.getId(), creatorWins, creatorGold, isPvp ? (creatorWins ? LOSE_GOLD_REWARD : WIN_GOLD_REWARD) : "-");
     }
 
     // ==================== 辅助方法 ====================
@@ -730,9 +763,10 @@ public class BattleServiceImpl implements BattleService {
             oppSlotInfos.add(toSlotInfo(i, oppSlots.get(i)));
         }
 
-        return BoardStateResponse.builder()
+        BoardStateResponse.BoardStateResponseBuilder builder = BoardStateResponse.builder()
                 .turnNumber(session.getTurnNumber())
                 .turnPhase(session.getTurnPhase().name())
+                .sessionStatus(session.getSessionStatus().name())
                 .playerSlots(mySlotInfos)
                 .opponentSlots(oppSlotInfos)
                 .playerHand(myHand.stream().map(this::cardToDetail).collect(Collectors.toList()))
@@ -742,8 +776,22 @@ public class BattleServiceImpl implements BattleService {
                 .playerHp(asPlayer ? session.getPlayerHp() : session.getOpponentHp())
                 .opponentHp(asPlayer ? session.getOpponentHp() : session.getPlayerHp())
                 .playerItems(parseJsonStringList(asPlayer ? session.getPlayerItems() : session.getOpponentItems()))
-                .opponentItems(parseJsonStringList(asPlayer ? session.getOpponentItems() : session.getPlayerItems()))
-                .build();
+                .opponentItems(parseJsonStringList(asPlayer ? session.getOpponentItems() : session.getPlayerItems()));
+
+        // 对战结束时附加结算信息
+        if (session.getSessionStatus() == SessionStatus.FINISHED) {
+            // 血量 >0 的一方胜利（投降时已将投降方血量置 0）
+            boolean creatorWon = session.getPlayerHp() > 0;
+            boolean callerWon = asPlayer ? creatorWon : !creatorWon;
+            builder.gameOver(true)
+                    .winner(callerWon ? "PLAYER" : "OPPONENT")
+                    .goldReward(callerWon ? WIN_GOLD_REWARD : LOSE_GOLD_REWARD)
+                    .pointsChange(callerWon ? WIN_POINTS : LOSE_POINTS);
+        } else {
+            builder.gameOver(false);
+        }
+
+        return builder.build();
     }
 
     private BoardStateResponse.SlotInfo toSlotInfo(int index, SlotData slot) {

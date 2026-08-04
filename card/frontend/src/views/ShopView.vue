@@ -66,7 +66,7 @@ function openPreview(item) {
 </script>
 
 <style scoped>
-.shop-view { min-height: 100vh; background: #1a1a2e; }
+.shop-view { min-height: 100vh; background: transparent; }
 .page-content { padding: 20px; max-width: 1400px; margin: 0 auto; }
 .shop-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
 .shop-header h2 { color: #e0e0e0; }

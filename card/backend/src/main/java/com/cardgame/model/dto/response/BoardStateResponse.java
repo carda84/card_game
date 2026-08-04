@@ -14,6 +14,7 @@ import java.util.List;
 public class BoardStateResponse {
     private Integer turnNumber;
     private String turnPhase;
+    private String sessionStatus;   // IN_PROGRESS | FINISHED
     private List<SlotInfo> playerSlots;   // 玩家 4 格位
     private List<SlotInfo> opponentSlots; // 对手 4 格位
     private List<CardDetailResponse> playerHand;
@@ -24,6 +25,11 @@ public class BoardStateResponse {
     private Integer opponentHp;
     private List<String> playerItems;
     private List<String> opponentItems;
+    /** PvP 结算信息（仅 FINISHED 时有值） */
+    private Boolean gameOver;
+    private String winner;          // PLAYER | OPPONENT | null
+    private Integer goldReward;
+    private Integer pointsChange;
 
     @Data
     @Builder

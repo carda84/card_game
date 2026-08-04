@@ -56,7 +56,7 @@ function selectAndGo(char) {
 </script>
 
 <style scoped>
-.char-select-page { min-height: 100vh; background: #1a1a2e; }
+.char-select-page { min-height: 100vh; background: transparent; }
 .page-content { padding: 2rem; max-width: 1000px; margin: 0 auto; }
 .page-content h2 { color: #e0e0e0; margin-bottom: 4px; }
 .subtitle { color: #888; margin-bottom: 20px; font-size: 0.9rem; }

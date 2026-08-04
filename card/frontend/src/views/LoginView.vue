@@ -44,7 +44,7 @@ function onRegisterSuccess() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #1a1a2e;
+  background: transparent;
 }
 
 .auth-card {

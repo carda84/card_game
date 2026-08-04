@@ -56,7 +56,7 @@ function openPreview(card) {
 <style scoped>
 .collection-view {
   min-height: 100vh;
-  background: #1a1a2e;
+  background: transparent;
   position: relative;
   overflow: hidden;
 }

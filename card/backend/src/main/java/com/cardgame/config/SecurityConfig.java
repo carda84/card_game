@@ -2,6 +2,7 @@ package com.cardgame.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -31,6 +32,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+            // 启用 CORS（必须在最前面，否则 OPTIONS 预检请求会被 Security 拦截）
+            .cors(Customizer.withDefaults())
+
             // 禁用 CSRF（REST API 无状态，不需要 CSRF 保护）
             .csrf(AbstractHttpConfigurer::disable)
 

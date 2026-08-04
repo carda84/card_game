@@ -15,7 +15,13 @@
 
 body {
   font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  background: #1a1a2e;
+  background:
+    linear-gradient(rgba(10, 10, 20, 0.65), rgba(10, 10, 20, 0.65)),
+    url('./assets/images/background.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
   color: #e0e0e0;
   -webkit-font-smoothing: antialiased;
 }

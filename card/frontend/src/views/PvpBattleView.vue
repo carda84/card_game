@@ -33,7 +33,7 @@ onMounted(() => {
 <style scoped>
 .pvp-battle-view {
   min-height: 100vh;
-  background: #1a1a2e;
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
