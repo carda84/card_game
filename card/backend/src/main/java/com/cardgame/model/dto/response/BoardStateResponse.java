@@ -25,6 +25,10 @@ public class BoardStateResponse {
     private Integer opponentHp;
     private List<String> playerItems;
     private List<String> opponentItems;
+    /** PvP 当前行动方用户 ID（null 表示 PvE 或无限制） */
+    private Long currentPlayerId;
+    /** 当前是否为调用者的回合 */
+    private Boolean isMyTurn;
     /** PvP 结算信息（仅 FINISHED 时有值） */
     private Boolean gameOver;
     private String winner;          // PLAYER | OPPONENT | null

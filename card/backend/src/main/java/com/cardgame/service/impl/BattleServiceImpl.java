@@ -97,7 +97,7 @@ public class BattleServiceImpl implements BattleService {
                 .levelId(request.getLevelId())
                 .playerUserId(userId)
                 .playerCharacterId(character.getId())
-                .currentPlayer(isPlayerFirst ? userId : null)
+                .currentPlayer(userId) // PvE 始终是玩家
                 .turnNumber(0)
                 .cardsPlayedThisTurn(0)
                 .playerHp(character.getMaxHp())
@@ -122,13 +122,23 @@ public class BattleServiceImpl implements BattleService {
         // 保存牌组状态
         session.setPlayerHand(toJson(handIds));
         session.setPlayerDrawPile(toJson(remainingDrawPile));
-        session.setBoardState(toJson(new BoardData(
+        BoardData initialBoard = new BoardData(
                 Arrays.asList(null, null, null, null),
                 Arrays.asList(null, null, null, null)
-        )));
+        );
+        session.setBoardState(toJson(initialBoard));
+
+        // PvE: AI 先手时自动执行首回合
+        List<TurnEndResponse.AiAction> aiFirstTurnActions = null;
+        if (request.getMode() == BattleMode.PVE && !isPlayerFirst) {
+            aiFirstTurnActions = executeAiTurn(session, initialBoard, new ArrayList<>());
+            session.setTurnNumber(1);
+            // AI 回合结束后轮到玩家抽牌
+        }
 
         gameSessionDao.save(session);
-        log.info("用户 {} 开始对战，sessionId={}, mode={}", userId, session.getId(), request.getMode());
+        log.info("用户 {} 开始对战，sessionId={}, mode={}, 先手={}", userId, session.getId(),
+                request.getMode(), isPlayerFirst ? "玩家" : "AI");
 
         // 构建响应
         List<CardDetailResponse> initialHand = handIds.stream()
@@ -139,6 +149,7 @@ public class BattleServiceImpl implements BattleService {
                 .initialHand(initialHand)
                 .opponentName(request.getMode() == BattleMode.PVE ? "AI 对手" : "对手")
                 .isPlayerFirst(isPlayerFirst)
+                .aiFirstTurnActions(aiFirstTurnActions)
                 .build();
     }
 
@@ -297,9 +308,10 @@ public class BattleServiceImpl implements BattleService {
         boolean playerIsAttacking = asPlayer;
         List<TurnEndResponse.AttackResult> attacks = resolveCombat(board, session, playerIsAttacking);
 
-        // PvE: AI 回合
+        // PvE: AI 回合（记录行动日志）
+        List<TurnEndResponse.AiAction> aiActions = null;
         if (!isPvp && session.getOpponentHp() > 0 && session.getPlayerHp() > 0) {
-            executeAiTurn(session, board, attacks);
+            aiActions = executeAiTurn(session, board, attacks);
         }
 
         // 检查游戏结束
@@ -333,6 +345,7 @@ public class BattleServiceImpl implements BattleService {
                 .opponentHp(asPlayer ? session.getOpponentHp() : session.getPlayerHp())
                 .isGameOver(isGameOver)
                 .winner(winner)
+                .aiActions(aiActions)
                 .build();
     }
 
@@ -393,8 +406,31 @@ public class BattleServiceImpl implements BattleService {
     @Override
     @Transactional
     public void useActiveSkill(Long userId, UseActiveSkillRequest request) {
-        // TODO: 人物主动技能实现
-        log.info("用户 {} 使用主动技能, sessionId={}", userId, request.getSessionId());
+        GameSession session = getSessionAndValidate(request.getSessionId(), userId);
+        if (session.getTurnPhase() != TurnPhase.PLAY_CARD)
+            throw new BusinessException("只能在出牌阶段使用主动技能");
+
+        // 主动技能：每局游戏可使用一次，效果由人物决定
+        // 目前简化实现：恢复己方所有场上卡牌 1 点血量（通用技能）
+        boolean asPlayer = isViewingAsPlayer(session, userId);
+        BoardData board = parseBoard(session.getBoardState());
+        List<SlotData> mySlots = asPlayer ? board.playerSlots : board.opponentSlots;
+
+        int healed = 0;
+        for (int i = 0; i < 4; i++) {
+            SlotData s = mySlots.get(i);
+            if (s != null) {
+                Card template = cardDao.findById(s.cardId).orElse(null);
+                if (template != null && s.currentHealth < template.getHealth()) {
+                    s.currentHealth = Math.min(s.currentHealth + 1, template.getHealth());
+                    healed++;
+                }
+            }
+        }
+
+        session.setBoardState(toJson(board));
+        gameSessionDao.save(session);
+        log.info("用户 {} 使用主动技能，恢复了 {} 张卡牌的血量, sessionId={}", userId, healed, request.getSessionId());
     }
 
     @Override
@@ -414,17 +450,20 @@ public class BattleServiceImpl implements BattleService {
         List<SlotData> oppSlots = asPlayer ? board.opponentSlots : board.playerSlots;
 
         switch (itemType) {
-            case SCISSORS: // 剪刀：摧毁对手随机一张卡牌
+            case SCISSORS: { // 剪刀：摧毁对手随机一张卡牌
+                List<Integer> occupiedSlots = new ArrayList<>();
                 for (int i = 0; i < 4; i++) {
-                    if (oppSlots.get(i) != null) {
-                        oppSlots.set(i, null);
-                        if (asPlayer) session.setPlayerBones(session.getPlayerBones() + 1);
-                        else session.setOpponentBones(session.getOpponentBones() + 1);
-                        log.info("剪刀摧毁对手卡牌: slot={}", i);
-                        break;
-                    }
+                    if (oppSlots.get(i) != null) occupiedSlots.add(i);
+                }
+                if (!occupiedSlots.isEmpty()) {
+                    int targetIdx = occupiedSlots.get(new Random().nextInt(occupiedSlots.size()));
+                    oppSlots.set(targetIdx, null);
+                    if (asPlayer) session.setPlayerBones(session.getPlayerBones() + 1);
+                    else session.setOpponentBones(session.getOpponentBones() + 1);
+                    log.info("剪刀摧毁对手卡牌: slot={}", targetIdx);
                 }
                 break;
+            }
             case PAINTBRUSH: // 画笔：清除对手所有卡牌印记
                 for (int i = 0; i < 4; i++) {
                     SlotData s = oppSlots.get(i);
@@ -432,7 +471,17 @@ public class BattleServiceImpl implements BattleService {
                 }
                 break;
             case FAN: // 扇子：本回合己方卡牌获得空袭
-                log.info("扇子: 己方卡牌本回合获得空袭");
+                for (int i = 0; i < 4; i++) {
+                    SlotData s = mySlots.get(i);
+                    if (s != null) {
+                        // 追加空袭印记（如果还没有）
+                        if (!hasSigil(s, "空袭")) {
+                            s.sigils = (s.sigils == null || s.sigils.isBlank())
+                                    ? "空袭" : s.sigils + ",空袭";
+                        }
+                    }
+                }
+                log.info("扇子: 己方卡牌获得空袭印记");
                 break;
             case FISHHOOK: // 鱼钩：拉对手有空位的对位卡
                 for (int i = 0; i < 4; i++) {
@@ -536,71 +585,179 @@ public class BattleServiceImpl implements BattleService {
 
     // ==================== AI 逻辑 (PvE) ====================
 
-    private void executeAiTurn(GameSession session, BoardData board, List<TurnEndResponse.AttackResult> attacks) {
-        // AI 抽牌
+    /**
+     * 执行 AI 完整回合，返回行动日志
+     */
+    private List<TurnEndResponse.AiAction> executeAiTurn(GameSession session, BoardData board,
+                                                         List<TurnEndResponse.AttackResult> attacks) {
+        List<TurnEndResponse.AiAction> actions = new ArrayList<>();
+
+        // === 1. AI 抽牌 ===
         List<Long> aiDrawPile = parseJsonList(session.getOpponentDrawPile());
         List<Long> aiHand = parseJsonList(session.getOpponentHand());
 
         if (!aiDrawPile.isEmpty()) {
-            aiHand.add(aiDrawPile.remove(0));
+            Long drawnId = aiDrawPile.remove(0);
+            aiHand.add(drawnId);
             session.setOpponentDrawPile(toJson(aiDrawPile));
+            Card drawnCard = cardDao.findById(drawnId).orElse(null);
+            String cardName = drawnCard != null ? drawnCard.getName() : "未知卡牌";
+            actions.add(TurnEndResponse.AiAction.builder()
+                    .type("DRAW").detail("从牌组抽了一张「" + cardName + "」").build());
         } else {
             // 牌组空了，抽松鼠
             Card squirrel = cardDao.findAll().stream()
                     .filter(c -> SQUIRREL_NAME.equals(c.getName())).findFirst().orElse(null);
-            if (squirrel != null) aiHand.add(squirrel.getId());
+            if (squirrel != null) {
+                aiHand.add(squirrel.getId());
+                actions.add(TurnEndResponse.AiAction.builder()
+                        .type("DRAW").detail("牌组已空，抽了一张松鼠牌").build());
+            }
         }
 
-        // AI 出牌（简单策略：尝试打出能出的最贵卡牌）
-        aiPlayCards(session, board, aiHand);
+        // === 2. AI 出牌 ===
+        aiPlayCards(session, board, aiHand, actions);
         session.setOpponentHand(toJson(aiHand));
 
-        // AI 攻击
-        attacks.addAll(resolveCombat(board, session, false));
+        // === 3. AI 使用道具 ===
+        aiUseItems(session, board, actions);
+
+        // === 4. AI 攻击 ===
+        List<TurnEndResponse.AttackResult> aiAttacks = resolveCombat(board, session, false);
+        attacks.addAll(aiAttacks);
+        if (!aiAttacks.isEmpty()) {
+            int totalDmg = aiAttacks.stream().mapToInt(TurnEndResponse.AttackResult::getDamage).sum();
+            long kills = aiAttacks.stream().filter(a -> Boolean.TRUE.equals(a.getDefenderDied())).count();
+            StringBuilder atkDesc = new StringBuilder("AI 发动攻击，共造成 " + totalDmg + " 点伤害");
+            if (kills > 0) atkDesc.append("，击杀 ").append(kills).append(" 张卡牌");
+            actions.add(TurnEndResponse.AiAction.builder()
+                    .type("ATTACK").detail(atkDesc.toString()).build());
+        }
+
+        return actions;
     }
 
-    private void aiPlayCards(GameSession session, BoardData board, List<Long> aiHand) {
-        // 按费用从高到低排序，尝试出牌
+    /**
+     * AI 出牌策略：评估卡牌价值，优先打出高价值卡牌
+     */
+    private void aiPlayCards(GameSession session, BoardData board, List<Long> aiHand,
+                             List<TurnEndResponse.AiAction> actions) {
+        // 按「综合价值」从高到低排序（攻击力 * 2 + 血量 - 费用惩罚）
         List<Card> handCards = aiHand.stream()
                 .map(id -> cardDao.findById(id).orElse(null))
                 .filter(Objects::nonNull)
-                .sorted(Comparator.comparingInt(c -> -(c.getBloodCost() + c.getBoneCost())))
+                .sorted(Comparator.comparingInt(this::cardValue).reversed())
                 .collect(Collectors.toList());
 
         int played = 0;
         for (Card card : handCards) {
             if (played >= 2) break; // AI 每回合最多出 2 张
 
-            // 找空位
-            int emptySlot = -1;
-            for (int i = 0; i < 4; i++) {
-                if (board.opponentSlots.get(i) == null) { emptySlot = i; break; }
-            }
-            if (emptySlot == -1) break;
+            // 智能选位：优先选对面有玩家空位的位置（可直接打脸）
+            int bestSlot = aiChooseSlot(board);
+            if (bestSlot == -1) break;
 
             boolean canPlay = false;
+            String costDesc = "";
 
             if (card.getBloodCost() == 0 && card.getBoneCost() == 0) {
-                canPlay = true; // 免费卡
+                canPlay = true;
+                costDesc = "免费";
             } else if (card.getBloodCost() > 0) {
-                // 尝试献祭自己的低价值卡牌
-                canPlay = aiTrySacrifice(board, card.getBloodCost(), session);
+                // 评估献祭是否值得：目标卡价值 > 被献祭卡价值总和才献祭
+                int sacCost = aiEvaluateSacrificeCost(board, card.getBloodCost());
+                int cardVal = cardValue(card);
+                if (sacCost >= 0 && cardVal > sacCost) {
+                    canPlay = aiPerformSacrifice(board, card.getBloodCost(), session, actions);
+                    costDesc = "献祭 " + card.getBloodCost() + " 张";
+                }
             } else if (card.getBoneCost() > 0 && session.getOpponentBones() >= card.getBoneCost()) {
                 session.setOpponentBones(session.getOpponentBones() - card.getBoneCost());
                 canPlay = true;
+                costDesc = "消耗 " + card.getBoneCost() + " 骨头";
             }
 
             if (canPlay) {
-                board.opponentSlots.set(emptySlot, new SlotData(card.getId(), card.getHealth(),
+                board.opponentSlots.set(bestSlot, new SlotData(card.getId(), card.getHealth(),
                         card.getAttack(), card.getSigils(), card.getIsSpecialAttack()));
                 aiHand.remove(card.getId());
                 played++;
+                String sigilInfo = card.getSigils() != null && !card.getSigils().isBlank()
+                        ? " [" + card.getSigils() + "]" : "";
+                actions.add(TurnEndResponse.AiAction.builder()
+                        .type("PLAY_CARD")
+                        .detail("在格位 " + (bestSlot + 1) + " 打出「" + card.getName() + "」" + sigilInfo
+                                + "（" + card.getHealth() + "❤️/" + card.getAttack() + "⚔️）" + costDesc)
+                        .build());
             }
         }
     }
 
-    private boolean aiTrySacrifice(BoardData board, int required, GameSession session) {
-        // 找 AI 牌桌上可以献祭的卡牌
+    /**
+     * 卡牌综合价值评估
+     */
+    private int cardValue(Card card) {
+        int atk = Boolean.TRUE.equals(card.getIsSpecialAttack()) ? 2 : (card.getAttack() != null ? card.getAttack() : 0);
+        int hp = card.getHealth() != null ? card.getHealth() : 1;
+        int costPenalty = card.getBloodCost() * 2 + card.getBoneCost();
+        // 印记加分
+        int sigilBonus = 0;
+        if (card.getSigils() != null) {
+            if (card.getSigils().contains("空袭")) sigilBonus += 3;
+            if (card.getSigils().contains("剧毒")) sigilBonus += 4;
+            if (card.getSigils().contains("双重打击")) sigilBonus += 3;
+            if (card.getSigils().contains("盾")) sigilBonus += 2;
+            if (card.getSigils().contains("反击")) sigilBonus += 1;
+        }
+        return atk * 2 + hp + sigilBonus - costPenalty;
+    }
+
+    /**
+     * 智能选位：优先选对面玩家空位（可直接打脸），其次任意空位
+     */
+    private int aiChooseSlot(BoardData board) {
+        // 优先：对面有玩家空位的位置
+        for (int i = 0; i < 4; i++) {
+            if (board.opponentSlots.get(i) == null && board.playerSlots.get(i) == null) {
+                return i;
+            }
+        }
+        // 其次：任意 AI 空位
+        for (int i = 0; i < 4; i++) {
+            if (board.opponentSlots.get(i) == null) return i;
+        }
+        return -1; // 无空位
+    }
+
+    /**
+     * 评估献祭成本：返回被献祭卡牌的总价值，-1 表示无法献祭
+     */
+    private int aiEvaluateSacrificeCost(BoardData board, int required) {
+        List<int[]> sacrificeable = new ArrayList<>(); // [slotIndex, cardValue]
+        for (int i = 0; i < 4; i++) {
+            SlotData s = board.opponentSlots.get(i);
+            if (s != null) {
+                Card c = cardDao.findById(s.cardId).orElse(null);
+                if (c != null && c.getCanSacrifice()) {
+                    sacrificeable.add(new int[]{i, cardValue(c)});
+                }
+            }
+        }
+        if (sacrificeable.size() < required) return -1;
+        // 按价值从低到高排序，牺牲最便宜的
+        sacrificeable.sort(Comparator.comparingInt(a -> a[1]));
+        int totalCost = 0;
+        for (int j = 0; j < required; j++) {
+            totalCost += sacrificeable.get(j)[1];
+        }
+        return totalCost;
+    }
+
+    /**
+     * 执行献祭并记录行动
+     */
+    private boolean aiPerformSacrifice(BoardData board, int required, GameSession session,
+                                       List<TurnEndResponse.AiAction> actions) {
         List<Integer> sacrificeableSlots = new ArrayList<>();
         for (int i = 0; i < 4; i++) {
             SlotData s = board.opponentSlots.get(i);
@@ -611,19 +768,146 @@ public class BattleServiceImpl implements BattleService {
         }
         if (sacrificeableSlots.size() < required) return false;
 
-        // 献祭最便宜的卡牌
+        // 按价值从低到高排序，献祭最便宜的
         sacrificeableSlots.sort(Comparator.comparingInt(i -> {
             SlotData s = board.opponentSlots.get(i);
             Card c = cardDao.findById(s.cardId).orElse(null);
-            return c != null ? c.getBloodCost() + c.getBoneCost() : 0;
+            return c != null ? cardValue(c) : 0;
         }));
 
         for (int j = 0; j < required; j++) {
             int sacSlot = sacrificeableSlots.get(j);
+            SlotData sacSlotData = board.opponentSlots.get(sacSlot);
+            Card sacCard = cardDao.findById(sacSlotData.cardId).orElse(null);
+            String sacName = sacCard != null ? sacCard.getName() : "未知";
             board.opponentSlots.set(sacSlot, null);
             session.setOpponentBones(session.getOpponentBones() + 1);
+            actions.add(TurnEndResponse.AiAction.builder()
+                    .type("SACRIFICE")
+                    .detail("献祭了格位 " + (sacSlot + 1) + " 的「" + sacName + "」，获得 1 骨头")
+                    .build());
         }
         return true;
+    }
+
+    /**
+     * AI 道具使用策略
+     */
+    private void aiUseItems(GameSession session, BoardData board, List<TurnEndResponse.AiAction> actions) {
+        List<String> items = parseJsonStringList(session.getOpponentItems());
+        if (items.isEmpty()) return;
+
+        // 计算 AI 场上卡牌数和玩家场上卡牌数
+        int aiCardsOnBoard = 0;
+        int playerCardsOnBoard = 0;
+        for (int i = 0; i < 4; i++) {
+            if (board.opponentSlots.get(i) != null) aiCardsOnBoard++;
+            if (board.playerSlots.get(i) != null) playerCardsOnBoard++;
+        }
+
+        List<String> remainingItems = new ArrayList<>(items);
+        Iterator<String> it = remainingItems.iterator();
+        int removeCount = 0;
+
+        while (it.hasNext()) {
+            String itemName = it.next();
+            ItemType itemType;
+            try {
+                itemType = ItemType.fromDisplayName(itemName);
+            } catch (IllegalArgumentException e) {
+                continue;
+            }
+
+            boolean used = false;
+            switch (itemType) {
+                case SCISSORS:
+                    // 玩家场上有卡牌时才用
+                    if (playerCardsOnBoard > 0) {
+                        List<Integer> occupiedSlots = new ArrayList<>();
+                        for (int i = 0; i < 4; i++) {
+                            if (board.playerSlots.get(i) != null) occupiedSlots.add(i);
+                        }
+                        if (!occupiedSlots.isEmpty()) {
+                            int targetIdx = occupiedSlots.get(new Random().nextInt(occupiedSlots.size()));
+                            Card targetCard = cardDao.findById(board.playerSlots.get(targetIdx).cardId).orElse(null);
+                            String targetName = targetCard != null ? targetCard.getName() : "未知";
+                            board.playerSlots.set(targetIdx, null);
+                            session.setOpponentBones(session.getOpponentBones() + 1);
+                            playerCardsOnBoard--;
+                            used = true;
+                            actions.add(TurnEndResponse.AiAction.builder()
+                                    .type("USE_ITEM")
+                                    .detail("使用剪刀摧毁了你的「" + targetName + "」")
+                                    .build());
+                        }
+                    }
+                    break;
+                case PAINTBRUSH:
+                    // 玩家场上有带印记的卡牌时才用
+                    boolean hasSigils = false;
+                    for (int i = 0; i < 4; i++) {
+                        SlotData s = board.playerSlots.get(i);
+                        if (s != null && s.sigils != null && !s.sigils.isBlank()) {
+                            hasSigils = true;
+                            s.sigils = null;
+                        }
+                    }
+                    if (hasSigils) {
+                        used = true;
+                        actions.add(TurnEndResponse.AiAction.builder()
+                                .type("USE_ITEM")
+                                .detail("使用画笔清除了你所有卡牌的印记")
+                                .build());
+                    }
+                    break;
+                case FAN:
+                    // AI 场上有卡牌时才用
+                    if (aiCardsOnBoard > 0) {
+                        for (int i = 0; i < 4; i++) {
+                            SlotData s = board.opponentSlots.get(i);
+                            if (s != null && !hasSigil(s, "空袭")) {
+                                s.sigils = (s.sigils == null || s.sigils.isBlank())
+                                        ? "空袭" : s.sigils + ",空袭";
+                            }
+                        }
+                        used = true;
+                        actions.add(TurnEndResponse.AiAction.builder()
+                                .type("USE_ITEM")
+                                .detail("使用扇子，己方卡牌本回合获得空袭")
+                                .build());
+                    }
+                    break;
+                case FISHHOOK:
+                    // 有对位空位时拉取
+                    for (int i = 0; i < 4; i++) {
+                        SlotData playerCard = board.playerSlots.get(i);
+                        if (playerCard != null && board.opponentSlots.get(i) == null) {
+                            board.opponentSlots.set(i, playerCard);
+                            board.playerSlots.set(i, null);
+                            Card pulledCard = cardDao.findById(playerCard.cardId).orElse(null);
+                            String pulledName = pulledCard != null ? pulledCard.getName() : "未知";
+                            playerCardsOnBoard--;
+                            aiCardsOnBoard++;
+                            used = true;
+                            actions.add(TurnEndResponse.AiAction.builder()
+                                    .type("USE_ITEM")
+                                    .detail("使用鱼钩拉取了你的「" + pulledName + "」到己方格位 " + (i + 1))
+                                    .build());
+                            break;
+                        }
+                    }
+                    break;
+            }
+
+            if (used) {
+                it.remove();
+                removeCount++;
+            }
+        }
+
+        if (removeCount > 0) {
+            session.setOpponentItems(toJson(remainingItems));
+        }
     }
 
     // ==================== PvE 对手初始化 ====================
@@ -767,6 +1051,7 @@ public class BattleServiceImpl implements BattleService {
                 .turnNumber(session.getTurnNumber())
                 .turnPhase(session.getTurnPhase().name())
                 .sessionStatus(session.getSessionStatus().name())
+                .currentPlayerId(session.getCurrentPlayer())
                 .playerSlots(mySlotInfos)
                 .opponentSlots(oppSlotInfos)
                 .playerHand(myHand.stream().map(this::cardToDetail).collect(Collectors.toList()))
@@ -777,6 +1062,17 @@ public class BattleServiceImpl implements BattleService {
                 .opponentHp(asPlayer ? session.getOpponentHp() : session.getPlayerHp())
                 .playerItems(parseJsonStringList(asPlayer ? session.getPlayerItems() : session.getOpponentItems()))
                 .opponentItems(parseJsonStringList(asPlayer ? session.getOpponentItems() : session.getPlayerItems()));
+
+        // 计算是否为调用者的回合
+        Long cp = session.getCurrentPlayer();
+        boolean isMyTurn;
+        if (cp == null) {
+            isMyTurn = true; // PvE 或未设置，默认可行动
+        } else {
+            Long callerId = asPlayer ? session.getPlayerUserId() : session.getOpponentUserId();
+            isMyTurn = cp.equals(callerId);
+        }
+        builder.isMyTurn(isMyTurn);
 
         // 对战结束时附加结算信息
         if (session.getSessionStatus() == SessionStatus.FINISHED) {
@@ -826,6 +1122,8 @@ public class BattleServiceImpl implements BattleService {
                 .canShuffle(c.getCanShuffle())
                 .canSacrifice(c.getCanSacrifice())
                 .price(c.getPrice())
+                .description(c.getDescription())
+                .imageUrl(c.getImageUrl())
                 .sacrificeDesc(c.getSacrificeDesc())
                 .briefDesc(c.getBriefDesc())
                 .build();

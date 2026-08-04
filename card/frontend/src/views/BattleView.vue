@@ -70,6 +70,9 @@
               <div class="hp-badge" v-if="slot.card">
                 <span>❤️{{ slot.card.health }}</span>
               </div>
+              <div class="sigil-badges" v-if="slot.card?.sigilList?.length">
+                <span v-for="(sig, si) in slot.card.sigilList.slice(0, 3)" :key="si" class="sigil-tag" :title="sig">{{ sig }}</span>
+              </div>
             </div>
             <div v-else class="slot-empty">·</div>
           </div>
@@ -100,6 +103,9 @@
               <div class="hp-badge" v-if="slot.card">
                 <span>❤️{{ slot.card.health }}</span>
               </div>
+              <div class="sigil-badges" v-if="slot.card?.sigilList?.length">
+                <span v-for="(sig, si) in slot.card.sigilList.slice(0, 3)" :key="si" class="sigil-tag" :title="sig">{{ sig }}</span>
+              </div>
             </div>
             <div v-else class="slot-empty">
               <span v-if="canPlayToSlot(idx)" class="play-hint">点击出牌</span>
@@ -108,13 +114,25 @@
           </div>
         </div>
 
+        <!-- PvP 等待提示 -->
+        <div v-if="battleStore.mode === 'PVP' && !battleStore.isMyTurn && !battleStore.gameOver" class="opponent-turn-banner">
+          <div class="otb-spinner"></div>
+          <span>对手回合，请等待...</span>
+        </div>
+
         <!-- 操作按钮 -->
         <div class="action-bar">
           <button
             class="btn btn-primary"
-            :disabled="battleStore.loading || !canEndTurn"
+            :disabled="battleStore.loading || !canEndTurn || !battleStore.isMyTurn"
             @click="handleEndTurn"
           >结束回合</button>
+          <button
+            class="btn btn-skill"
+            :disabled="battleStore.loading || !isPlayPhase || !battleStore.isMyTurn"
+            @click="handleUseSkill"
+            v-if="battleStore.mode !== null"
+          >主动技能</button>
           <button
             class="btn btn-danger"
             :disabled="battleStore.loading"
@@ -275,6 +293,26 @@
       </div>
     </Teleport>
 
+    <!-- AI 行动日志弹窗 -->
+    <Teleport to="body">
+      <div v-if="showAiLog" class="modal-overlay">
+        <div class="modal-card ai-log-dialog">
+          <h3>🤖 AI 对手行动</h3>
+          <p class="sub">AI 回合执行了以下操作：</p>
+          <div class="ai-log-list">
+            <div v-for="(action, idx) in battleStore.aiActions" :key="idx" class="ai-log-item">
+              <span class="ai-log-type">{{ aiActionIcon(action.type) }}</span>
+              <span class="ai-log-detail">{{ action.detail }}</span>
+            </div>
+            <div v-if="!battleStore.aiActions.length" class="ai-log-empty">AI 本回合未执行任何操作</div>
+          </div>
+          <div class="confirm-actions">
+            <button class="btn btn-primary" @click="closeAiLog">确认</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- 提示条 -->
     <Transition name="slide">
       <div v-if="battleStore.message" class="toast">{{ battleStore.message }}</div>
@@ -318,6 +356,7 @@ const sacrificeSlots = ref([])
 const sacSelecting = ref(false)
 const showDrawDialog = ref(false)
 const showAttackLog = ref(false)
+const showAiLog = ref(false)
 const showItemConfirm = ref(false)
 const showSurrenderConfirm = ref(false)
 const pendingItemIdx = ref(null)
@@ -330,7 +369,7 @@ const selectedCard = computed(() => {
 })
 
 const isPlayPhase = computed(() => battleStore.turnPhase === 'PLAY_CARD')
-const canEndTurn = computed(() => battleStore.turnPhase === 'PLAY_CARD')
+const canEndTurn = computed(() => battleStore.turnPhase === 'PLAY_CARD' && battleStore.isMyTurn)
 const canStartSac = computed(() => {
   if (!selectedCard.value) return false
   const needed = selectedCard.value.bloodCost
@@ -365,7 +404,7 @@ function isSacTarget(idx) {
   return sacSelecting.value && sacrificeSlots.value.includes(idx)
 }
 function canPlayToSlot(idx) {
-  if (!isPlayPhase.value || selectedHandIdx.value === null) return false
+  if (!isPlayPhase.value || !battleStore.isMyTurn || selectedHandIdx.value === null) return false
   const slot = battleStore.playerSlots[idx]
   if (!slot || !slot.isEmpty) return false
   const card = selectedCard.value
@@ -382,6 +421,11 @@ function canPlayToSlot(idx) {
 function onHandCardClick(idx) {
   if (!isPlayPhase.value) {
     battleStore.message = '当前不是出牌阶段'
+    setTimeout(() => battleStore.message = '', 1500)
+    return
+  }
+  if (!battleStore.isMyTurn) {
+    battleStore.message = '当前不是你的回合'
     setTimeout(() => battleStore.message = '', 1500)
     return
   }
@@ -487,7 +531,10 @@ async function handleEndTurn() {
   cancelSacrifice()
   try {
     const res = await battleStore.endTurn()
-    if (res.attacks?.length) {
+    // PvE: 优先显示 AI 行动日志
+    if (battleStore.aiActions.length > 0) {
+      showAiLog.value = true
+    } else if (res.attacks?.length) {
       showAttackLog.value = true
     }
   } catch (e) {
@@ -531,6 +578,33 @@ function previewCard(card) {
   previewVisible.value = true
 }
 
+async function handleUseSkill() {
+  try {
+    await battleStore.useSkill(0)
+    battleStore.message = '主动技能使用成功：己方场上卡牌恢复1点血量'
+    setTimeout(() => battleStore.message = '', 2000)
+  } catch (e) {
+    battleStore.message = e.message || '技能使用失败'
+    setTimeout(() => battleStore.message = '', 2000)
+  }
+}
+
+function aiActionIcon(type) {
+  const icons = {
+    'DRAW': '🃏',
+    'PLAY_CARD': '▶️',
+    'SACRIFICE': '💀',
+    'USE_ITEM': '🎒',
+    'ATTACK': '⚔️'
+  }
+  return icons[type] || '•'
+}
+
+function closeAiLog() {
+  showAiLog.value = false
+  battleStore.aiActions = []
+}
+
 function goToResult() {
   router.push('/battle/result')
 }
@@ -552,11 +626,15 @@ onMounted(async () => {
   // PvE 模式：来自关卡选择
   if (route.query.levelId && route.query.deckId && !battleStore.sessionId) {
     try {
-      await battleStore.startBattle({
+      const res = await battleStore.startBattle({
         mode: 'PVE',
         levelId: Number(route.query.levelId),
         deckId: Number(route.query.deckId)
       })
+      // AI 先手时显示首回合行动日志
+      if (res && res.aiFirstTurnActions?.length > 0) {
+        showAiLog.value = true
+      }
     } catch (e) {
       battleStore.message = e.message || '开始对战失败'
     }
@@ -564,7 +642,8 @@ onMounted(async () => {
 })
 
 watch(() => battleStore.turnPhase, (phase) => {
-  if (phase === 'DRAW' && battleStore.sessionId && !battleStore.gameOver) {
+  // 抽牌弹窗：仅在“抽牌阶段”且是调用者的回合时显示
+  if (phase === 'DRAW' && battleStore.sessionId && !battleStore.gameOver && battleStore.isMyTurn) {
     showDrawDialog.value = true
   } else {
     showDrawDialog.value = false
@@ -893,6 +972,24 @@ function handleBeforeUnload() {
   border: 1px solid #dc3545;
   font-weight: bold;
 }
+.sigil-badges {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  max-width: 90%;
+}
+.sigil-tag {
+  background: rgba(167, 139, 250, 0.85);
+  color: #fff;
+  font-size: 0.58rem;
+  padding: 0px 3px;
+  border-radius: 3px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
 
 .board-divider {
   height: 4px;
@@ -1112,6 +1209,39 @@ function handleBeforeUnload() {
   margin-bottom: 14px;
 }
 
+.ai-log-dialog {
+  max-width: 520px;
+}
+.ai-log-list {
+  max-height: 300px;
+  overflow-y: auto;
+  margin: 10px 0;
+  text-align: left;
+}
+.ai-log-item {
+  display: flex;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(15, 52, 96, 0.5);
+  font-size: 0.85rem;
+}
+.ai-log-type {
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+.ai-log-detail {
+  color: #e0e0e0;
+  line-height: 1.4;
+}
+.ai-log-empty {
+  color: #555;
+  text-align: center;
+  padding: 20px;
+  font-size: 0.85rem;
+}
+.ai-log-list::-webkit-scrollbar { width: 5px; }
+.ai-log-list::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
+
 .btn {
   padding: 8px 16px;
   border: none;
@@ -1130,6 +1260,29 @@ function handleBeforeUnload() {
 .btn-ghost:hover { border-color: #ffd700; color: #ffd700; }
 .btn-sac { background: linear-gradient(135deg, #8b0000, #5c0000); }
 .btn-bone { background: linear-gradient(135deg, #8b5e3c, #5c3d26); }
+.btn-skill { background: linear-gradient(135deg, #6a5acd, #483d8b); }
+
+.opponent-turn-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px;
+  background: rgba(233, 69, 96, 0.15);
+  border: 1px solid rgba(233, 69, 96, 0.4);
+  border-radius: 10px;
+  color: #e94560;
+  font-size: 0.95rem;
+  margin: 6px 0;
+}
+.otb-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #e94560;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
 
 .toast {
   position: fixed;

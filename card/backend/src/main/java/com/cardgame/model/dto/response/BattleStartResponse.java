@@ -18,4 +18,6 @@ public class BattleStartResponse {
     private Long opponentCharacterId;
     private String opponentCharacterName;
     private Boolean isPlayerFirst; // 是否先手
+    /** PvE: AI 先手时的首回合行动日志 */
+    private List<TurnEndResponse.AiAction> aiFirstTurnActions;
 }

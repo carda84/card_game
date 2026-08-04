@@ -17,6 +17,8 @@ public class TurnEndResponse {
     private Integer opponentHp;
     private Boolean isGameOver;
     private String winner; // null 表示未结束
+    /** PvE: AI 回合行动日志 */
+    private List<AiAction> aiActions;
 
     @Data
     @Builder
@@ -28,5 +30,15 @@ public class TurnEndResponse {
         private Integer damage;
         private Boolean defenderDied;
         private Boolean attackerDied; // 反击等情况
+    }
+
+    /** AI 单步行动记录 */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AiAction {
+        private String type;    // DRAW | PLAY_CARD | SACRIFICE | USE_ITEM | ATTACK
+        private String detail;  // 人可读的描述
     }
 }

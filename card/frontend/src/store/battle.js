@@ -14,6 +14,7 @@ export const useBattleStore = defineStore('battle', () => {
   const gameOver = ref(false)
   const result = ref(null)          // BattleEndResponse
   const lastAttacks = ref([])       // 上一次攻击结果
+  const aiActions = ref([])         // AI 行动日志
   const message = ref('')           // 提示信息
   const pollingTimer = ref(null)    // PvP 轮询定时器
 
@@ -29,6 +30,8 @@ export const useBattleStore = defineStore('battle', () => {
   const playerItems = computed(() => board.value?.playerItems || [])
   const opponentHandCount = computed(() => board.value?.opponentHandCount ?? 0)
   const turnNumber = computed(() => board.value?.turnNumber ?? 0)
+  const currentPlayerId = computed(() => board.value?.currentPlayerId ?? null)
+  const isMyTurn = computed(() => board.value?.isMyTurn ?? true)
 
   // ====== 动作 ======
 
@@ -41,6 +44,8 @@ export const useBattleStore = defineStore('battle', () => {
       mode.value = data.mode || 'PVE'
       opponentName.value = res.opponentName || '对手'
       isPlayerFirst.value = res.isPlayerFirst
+      // 保存 AI 先手首回合行动
+      aiActions.value = res.aiFirstTurnActions || []
       await refreshBoard()
       return res
     } finally {
@@ -134,6 +139,8 @@ export const useBattleStore = defineStore('battle', () => {
     try {
       const res = await battleApi.endTurn({ sessionId: sessionId.value })
       lastAttacks.value = res.attacks || []
+      // 保存 AI 行动日志
+      aiActions.value = res.aiActions || []
       await refreshBoard()
       if (res.isGameOver) {
         gameOver.value = true
@@ -200,6 +207,7 @@ export const useBattleStore = defineStore('battle', () => {
     gameOver.value = false
     result.value = null
     lastAttacks.value = []
+    aiActions.value = []
     message.value = ''
   }
 
@@ -222,11 +230,11 @@ export const useBattleStore = defineStore('battle', () => {
   return {
     // state
     sessionId, mode, opponentName, opponentCharacterName, isPlayerFirst,
-    board, loading, gameOver, result, lastAttacks, message,
+    board, loading, gameOver, result, lastAttacks, aiActions, message,
     // computed
     turnPhase, playerHp, opponentHp, playerBones, opponentBones,
     playerHand, playerSlots, opponentSlots, playerItems,
-    opponentHandCount, turnNumber,
+    opponentHandCount, turnNumber, currentPlayerId, isMyTurn,
     // actions
     startBattle, attachSession, refreshBoard, drawCard, playCard,
     endTurn, doSurrender, useItem, useSkill, resetBattle,
