@@ -20,11 +20,11 @@
       <div class="card-info" v-if="card">
         <span class="stat health">❤️ {{ card.health }}</span>
         <span class="stat attack">⚔️ {{ card.attack ?? '特殊' }}</span>
-        <span class="stat cost">🩸{{ card.bloodCost }}</span>
+        <span class="stat cost"><img :src="bloodImg" class="icon-sm" />{{ card.bloodCost }}</span>
         <span v-if="card.boneCost > 0" class="stat cost">🦴{{ card.boneCost }}</span>
       </div>
       <p v-if="card?.sigils" class="sigils">✨ {{ card.sigils }}</p>
-      <p v-if="card?.races" class="races">🏷️ {{ card.races }}</p>
+      <p v-if="card?.races" class="races"><img :src="raceImg" class="icon-sm" />{{ card.races }}</p>
     </div>
 
     <!-- 操作区（可选） -->
@@ -37,6 +37,8 @@
 <script setup>
 import { computed } from 'vue'
 import { getCardImage } from '../../utils/cardImages'
+import bloodImg from '../../assets/images/blood.png'
+import raceImg from '../../assets/images/race.png'
 
 const props = defineProps({
   name: { type: String, required: true },
@@ -111,9 +113,10 @@ const imageUrl = computed(() => getCardImage(props.name))
 .stat { white-space: nowrap; }
 .stat.health { color: #ff6b6b; }
 .stat.attack { color: #ffa07a; }
-.stat.cost { color: #aaa; }
+.stat.cost { color: #ff6b6b; display: inline-flex; align-items: center; gap: 2px; }
+.icon-sm { width: 14px; height: 14px; object-fit: contain; vertical-align: middle; }
 .sigils { color: #a78bfa; font-size: 0.78rem; margin: 2px 0; }
-.races { color: #60a5fa; font-size: 0.78rem; margin: 2px 0; }
+.races { color: #60a5fa; font-size: 0.78rem; margin: 2px 0; display: flex; align-items: center; gap: 4px; }
 
 .card-footer {
   display: flex;

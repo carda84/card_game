@@ -28,8 +28,11 @@ export const useShopStore = defineStore('shop', () => {
       if (result.remainingGold !== undefined) {
         userStore.updateGold(result.remainingGold)
       }
-      // 刷新商店列表
-      await fetchItems()
+      // 直接更新本地状态，不重新加载整个列表（避免滚动跳动）
+      const item = items.value.find(i => i.cardId === cardId)
+      if (item) {
+        item.owned = true
+      }
       return true
     } catch (e) {
       error.value = e.message || '购买失败'

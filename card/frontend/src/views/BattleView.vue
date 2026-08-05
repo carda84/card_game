@@ -47,16 +47,11 @@
       </aside>
 
       <!-- 中央：牌桌 -->
-      <main class="board-area" :style="{ backgroundImage: `url(${deskImg})` }">
-        <!-- 回合信息 -->
-        <div class="turn-bar">
-          <span>回合 {{ battleStore.turnNumber }}</span>
-          <span class="phase-tag">{{ phaseLabel }}</span>
-          <span v-if="battleStore.mode === 'PVP'" class="mode-tag">PvP</span>
-          <span v-else class="mode-tag">PvE</span>
-        </div>
+      <main class="board-area">
+        <!-- 牌桌背景图 -->
+        <img :src="deskImg" class="desk-bg" alt="" />
 
-        <!-- 对手格位 -->
+        <!-- 对手格位 (绝对定位，贴合背景图上方卡槽) -->
         <div class="slots-row opponent-row">
           <div
             v-for="(slot, idx) in battleStore.opponentSlots"
@@ -78,11 +73,7 @@
           </div>
         </div>
 
-        <div class="board-divider">
-          <span class="divider-glow"></span>
-        </div>
-
-        <!-- 我方格位 -->
+        <!-- 我方格位 (绝对定位，贴合背景图下方卡槽) -->
         <div class="slots-row player-row">
           <div
             v-for="(slot, idx) in battleStore.playerSlots"
@@ -97,7 +88,7 @@
             }"
             @click="onPlayerSlotClick(idx)"
           >
-            <div v-if="!slot.isEmpty" class="card-on-board" @click.stop="previewCard(slot.card)">
+            <div v-if="!slot.isEmpty" class="card-on-board" @click.stop="onPlayerSlotClick(idx)">
               <img v-if="getImg(slot.card)" :src="getImg(slot.card)" class="card-img" />
               <div v-else class="card-ph"><span>🃏</span></div>
               <div class="hp-badge" v-if="slot.card">
@@ -106,6 +97,7 @@
               <div class="sigil-badges" v-if="slot.card?.sigilList?.length">
                 <span v-for="(sig, si) in slot.card.sigilList.slice(0, 3)" :key="si" class="sigil-tag" :title="sig">{{ sig }}</span>
               </div>
+              <div class="card-preview-overlay" @click.stop="previewCard(slot.card)">🔍</div>
             </div>
             <div v-else class="slot-empty">
               <span v-if="canPlayToSlot(idx)" class="play-hint">点击出牌</span>
@@ -114,13 +106,21 @@
           </div>
         </div>
 
+        <!-- 回合信息浮层 -->
+        <div class="turn-bar">
+          <span>回合 {{ battleStore.turnNumber }}</span>
+          <span class="phase-tag">{{ phaseLabel }}</span>
+          <span v-if="battleStore.mode === 'PVP'" class="mode-tag">PvP</span>
+          <span v-else class="mode-tag">PvE</span>
+        </div>
+
         <!-- PvP 等待提示 -->
         <div v-if="battleStore.mode === 'PVP' && !battleStore.isMyTurn && !battleStore.gameOver" class="opponent-turn-banner">
           <div class="otb-spinner"></div>
           <span>对手回合，请等待...</span>
         </div>
 
-        <!-- 操作按钮 -->
+        <!-- 操作按钮浮层 -->
         <div class="action-bar">
           <button
             class="btn btn-primary"
@@ -226,7 +226,7 @@
           <div class="hc-info">
             <div class="hc-name">{{ card.name }}</div>
             <div class="hc-costs">
-              <span v-if="card.bloodCost > 0" class="cost blood">🩸{{ card.bloodCost }}</span>
+              <span v-if="card.bloodCost > 0" class="cost blood"><img :src="bloodImg" class="icon-sm" />{{ card.bloodCost }}</span>
               <span v-if="card.boneCost > 0" class="cost bone">🦴{{ card.boneCost }}</span>
               <span v-if="card.bloodCost === 0 && card.boneCost === 0" class="cost free">免费</span>
             </div>
@@ -253,7 +253,10 @@
               <div class="opt-desc">无限供应</div>
             </button>
             <button class="draw-opt" @click="doDraw('DECK')">
-              <div class="opt-img">🃏</div>
+              <div class="opt-img">
+                <img v-if="wolfImg" :src="wolfImg" />
+                <span v-else>🐺</span>
+              </div>
               <div class="opt-name">牌组抽牌</div>
               <div class="opt-desc">抽取牌组中的卡牌</div>
             </button>
@@ -346,6 +349,7 @@ import { useBattleStore } from '../store/battle'
 import CardImageModal from '../components/card/CardImageModal.vue'
 import { getCardImage } from '../utils/cardImages'
 import deskImg from '../assets/images/desk.jpg'
+import bloodImg from '../assets/images/blood.png'
 
 const route = useRoute()
 const router = useRouter()
@@ -383,6 +387,7 @@ const selectedItemName = computed(() => {
 
 const opponentItems = computed(() => battleStore.board?.opponentItems || [])
 const squirrelImg = computed(() => getCardImage('松鼠'))
+const wolfImg = computed(() => getCardImage('狼'))
 
 const phaseLabel = computed(() => {
   const p = battleStore.turnPhase
@@ -461,6 +466,12 @@ function onPlayerSlotClick(idx) {
     if (sacrificeSlots.value.length === needed) {
       sacSelecting.value = false
     }
+    return
+  }
+
+  // 非献祭模式：点击有卡的格位 -> 预览卡牌
+  if (slot && !slot.isEmpty) {
+    previewCard(slot.card)
     return
   }
 
@@ -828,41 +839,107 @@ function handleBeforeUnload() {
 }
 
 .board-area {
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
   border: 2px solid rgba(255, 215, 0, 0.3);
   border-radius: 16px;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
   position: relative;
   overflow: hidden;
+  background: #0a1a12;
+  aspect-ratio: 4 / 3;
 }
 
-/* 牌桌图片上的暗色遮罩，让卡牌更突出 */
-.board-area::before {
-  content: '';
+.desk-bg {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: 14px;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   pointer-events: none;
+  z-index: 0;
 }
 
-/* 牌桌内容层 */
-.board-area > * {
+/* 牌桌内容层 - 所有子元素绝对定位 */
+.board-area > *:not(.desk-bg) {
   position: relative;
   z-index: 1;
 }
+
+/* 对手卡槽行 - 贴合背景图上方矩形区域 */
+.opponent-row {
+  position: absolute;
+  top: 12%;
+  left: 15%;
+  right: 15%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2.5%;
+  z-index: 2;
+}
+
+/* 我方卡槽行 - 贴合背景图下方矩形区域 */
+.player-row {
+  position: absolute;
+  bottom: 12%;
+  left: 15%;
+  right: 15%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2.5%;
+  z-index: 2;
+}
+
+/* 回合信息 - 顶部居中浮层 */
 .turn-bar {
+  position: absolute;
+  top: 2%;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  justify-content: space-between;
+  gap: 10px;
   align-items: center;
-  color: #888;
-  font-size: 0.85rem;
-  padding: 4px 8px;
+  color: #e0e0e0;
+  font-size: 0.8rem;
+  padding: 4px 14px;
+  background: rgba(0, 0, 0, 0.65);
+  border-radius: 20px;
+  backdrop-filter: blur(6px);
+  z-index: 3;
+  white-space: nowrap;
+}
+
+/* 操作按钮 - 底部居中浮层 */
+.action-bar {
+  position: absolute;
+  bottom: 2%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.65);
+  border-radius: 20px;
+  padding: 6px 16px;
+  backdrop-filter: blur(6px);
+  z-index: 3;
+  white-space: nowrap;
+}
+
+/* PvP 等待提示 - 居中浮层 */
+.opponent-turn-banner {
+  position: absolute;
+  top: 46%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  background: rgba(233, 69, 96, 0.35);
+  border: 1px solid rgba(233, 69, 96, 0.6);
+  border-radius: 12px;
+  color: #ff8a9e;
+  font-size: 0.95rem;
+  backdrop-filter: blur(6px);
+  z-index: 4;
+  white-space: nowrap;
 }
 .phase-tag {
   background: #e94560;
@@ -882,29 +959,32 @@ function handleBeforeUnload() {
 .slots-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+  gap: 2.5%;
 }
 .slot {
   aspect-ratio: 3 / 4;
-  background: rgba(13, 27, 42, 0.5);
-  border: 2px dashed rgba(255, 215, 0, 0.3);
-  border-radius: 10px;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 8px;
   position: relative;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
-  backdrop-filter: blur(2px);
 }
 .slot.filled {
-  border-style: solid;
-  border-color: rgba(42, 90, 58, 0.8);
-  background: rgba(13, 27, 42, 0.3);
+  border-color: rgba(255, 215, 0, 0.4);
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+}
+.slot.opponent-slot:not(.filled) {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.1);
 }
 .slot.player-slot.empty.can-play {
   border-color: #ffd700;
-  background: rgba(255, 215, 0, 0.08);
+  background: rgba(255, 215, 0, 0.12);
   cursor: pointer;
   animation: pulse 1.2s ease-in-out infinite;
 }
@@ -914,24 +994,33 @@ function handleBeforeUnload() {
 }
 .slot.player-slot.sac-target {
   border-color: #dc3545;
-  background: rgba(220, 53, 69, 0.12);
+  background: rgba(220, 53, 69, 0.2);
+  box-shadow: 0 0 12px rgba(220, 53, 69, 0.3);
 }
 .slot.player-slot.sac-selectable {
   border-color: #ffd700;
+  background: rgba(255, 215, 0, 0.1);
   cursor: pointer;
+  animation: sacGlow 1s ease-in-out infinite;
+}
+@keyframes sacGlow {
+  0%, 100% { box-shadow: 0 0 4px rgba(255,215,0,0.3); }
+  50% { box-shadow: 0 0 14px rgba(255,215,0,0.5); }
 }
 .slot.player-slot.sac-selectable:hover {
   border-color: #fff;
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+  box-shadow: 0 0 18px rgba(255, 215, 0, 0.5);
 }
 .slot-empty {
-  color: #333;
+  color: rgba(255,255,255,0.15);
   font-size: 1.2rem;
 }
 .play-hint {
   color: #ffd700;
   font-size: 0.8rem;
   letter-spacing: 1px;
+  text-shadow: 0 0 6px rgba(255,215,0,0.5);
 }
 
 .card-on-board {
@@ -943,21 +1032,43 @@ function handleBeforeUnload() {
   cursor: pointer;
   position: relative;
 }
+.card-on-board:hover .card-preview-overlay {
+  opacity: 1;
+}
+.card-preview-overlay {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+  cursor: pointer;
+  z-index: 5;
+}
 .card-img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   display: block;
+  border-radius: 6px;
 }
 .card-ph {
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, #0d1b2a, #16213e);
+  background: linear-gradient(135deg, rgba(13,27,42,0.6), rgba(22,33,62,0.6));
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 2.5rem;
-  opacity: 0.4;
+  opacity: 0.5;
+  border-radius: 6px;
 }
 .card-ph.small { font-size: 1.5rem; }
 .hp-badge {
@@ -989,21 +1100,6 @@ function handleBeforeUnload() {
   border-radius: 3px;
   line-height: 1.3;
   white-space: nowrap;
-}
-
-.board-divider {
-  height: 4px;
-  background: linear-gradient(90deg, transparent, rgba(233, 69, 96, 0.6), transparent);
-  border-radius: 2px;
-  position: relative;
-  margin: 4px 0;
-}
-
-.action-bar {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 4px;
 }
 
 .attack-log {
@@ -1110,9 +1206,10 @@ function handleBeforeUnload() {
 .hc-info { padding: 2px 2px 0; }
 .hc-name { color: #ffd700; font-size: 0.78rem; line-height: 1.2; }
 .hc-costs { display: flex; gap: 4px; font-size: 0.72rem; margin-top: 2px; }
-.cost.blood { color: #ff6b6b; }
+.cost.blood { color: #ff6b6b; display: inline-flex; align-items: center; gap: 2px; }
 .cost.bone { color: #ffa07a; }
 .cost.free { color: #90ee90; }
+.icon-sm { width: 12px; height: 12px; object-fit: contain; vertical-align: middle; }
 .preview-btn {
   background: transparent;
   border: 1px solid #0f3460;
@@ -1262,19 +1359,6 @@ function handleBeforeUnload() {
 .btn-bone { background: linear-gradient(135deg, #8b5e3c, #5c3d26); }
 .btn-skill { background: linear-gradient(135deg, #6a5acd, #483d8b); }
 
-.opponent-turn-banner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 10px;
-  background: rgba(233, 69, 96, 0.15);
-  border: 1px solid rgba(233, 69, 96, 0.4);
-  border-radius: 10px;
-  color: #e94560;
-  font-size: 0.95rem;
-  margin: 6px 0;
-}
 .otb-spinner {
   width: 18px;
   height: 18px;

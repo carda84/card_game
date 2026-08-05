@@ -18,7 +18,9 @@ const cardNameToFile = {
   // 狼族
   '狼': 'wolf.png',
   '狼崽': 'wolf cub.png',
-  '冰原狼': 'alpha.png',
+  '头狼': 'alpha.png',
+  '冰原狼': 'dire wolf.png',
+  '冰原狼幼崽': 'dire wolf pup.png',
   '郊狼': 'coyote.png',
   '寻血猎犬': 'blod hound.png',
 
@@ -43,6 +45,8 @@ const cardNameToFile = {
   '蚁后': 'ant queen.png',
   '尸蛆': 'corpse maggots.png',
   '奇怪幼虫': 'strange larva.png',
+  '飞蚂蚁': 'flying ant.png',
+  '面包虫': 'meal worm.png',
   '触手': 'tantacle.png',
   '大触手': 'big tantacle.png',
 
@@ -55,14 +59,17 @@ const cardNameToFile = {
   '衔尾蛇': 'ouroborus.png',
   '蝌蚪': 'tadpole.png',
   '响尾蛇': 'rattler.png',
+  '东方泥龟': 'mud turtle.png',
 
   // 鸟类
-  '胡鹫': 'turkey vulture.png',
+  '胡鹫': 'lammergeier.png',
+  '秃鹫': 'turkey vulture.png',
   '翠鸟': 'king fisher.png',
   '喜鹊': 'magpie.png',
   '麻雀': 'sparrow.png',
   '渡鸦': 'raven.png',
   '渡鸦蛋': 'raven egg.png',
+  '布谷鸟': 'cuckoo.png',
 
   // 水生
   '大白鲨': 'graet white.png',
@@ -88,12 +95,14 @@ const cardNameToFile = {
   '田鼠': 'field mice.png',
   '林鼠': 'pack rat.png',
 
-  // 衍生/特殊
+  // 特殊卡牌
   '松鼠': 'squirrel.png',
   '兔子': 'rabbit.png',
   '兔子窝': 'warren.png',
   '尾巴': 'tail.png',
   '铃铛': 'chime.png',
+  '堤坝': 'dam.png',
+  '破碎的蛋': 'broken egg.png',
 }
 
 /**

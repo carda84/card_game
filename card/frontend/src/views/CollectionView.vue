@@ -12,7 +12,11 @@
         <span class="bg-icon i6">🐾</span>
       </div>
 
-      <h2>🃏 我的卡牌收藏</h2>
+      <h2 class="page-title">
+        <span class="pt-icon">🃏</span>
+        <span>我的卡牌收藏</span>
+        <span class="count-badge" v-if="cardStore.cards?.length">{{ cardStore.cards.length }}</span>
+      </h2>
 
       <div v-if="cardStore.loading" class="loading">加载中...</div>
       <div v-else class="card-grid">
@@ -94,15 +98,45 @@ function openPreview(card) {
   max-width: 1400px;
   margin: 0 auto;
 }
-.page-content h2 {
-  color: #e0e0e0;
-  margin-bottom: 16px;
-  font-size: 1.4rem;
+.page-content h2, .page-title {
+  color: var(--text-primary);
+  margin-bottom: 18px;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
-.loading { color: #888; padding: 20px; }
+.pt-icon { font-size: 1.4rem; }
+.count-badge {
+  font-size: 0.78rem;
+  padding: 3px 10px;
+  background: rgba(167, 139, 250, 0.15);
+  color: var(--purple, #a78bfa);
+  border-radius: 50px;
+  font-weight: 600;
+  border: 1px solid rgba(167, 139, 250, 0.25);
+}
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px;
+  color: var(--text-muted);
+}
+.loading::before {
+  content: '';
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: #e94560;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 16px;
 }
 </style>

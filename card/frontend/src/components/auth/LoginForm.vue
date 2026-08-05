@@ -48,58 +48,75 @@ async function handleLogin() {
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 .form-group label {
-  font-size: 0.85rem;
-  color: #aaa;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary, #a0aec0);
+  letter-spacing: 0.3px;
 }
 .form-group input {
-  padding: 10px 12px;
-  border: 1px solid #333;
-  border-radius: 6px;
-  background: #0d1117;
-  color: #e0e0e0;
+  padding: 11px 14px;
+  border: 1px solid var(--border, #1e3a5f);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg-input, #0d1b2a);
+  color: var(--text-primary, #f0f0f0);
   font-size: 0.95rem;
   outline: none;
-  transition: border-color 0.2s;
+  transition: all 0.2s;
 }
-.form-group input:focus {
-  border-color: #e94560;
+.form-group input::placeholder {
+  color: var(--text-dim, #4a5568);
 }
 .btn-primary {
-  padding: 10px;
+  padding: 12px;
   border: none;
-  border-radius: 6px;
-  background: #e94560;
+  border-radius: var(--radius-sm, 6px);
+  background: linear-gradient(135deg, #e94560, #c23152);
   color: white;
   font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: all 0.25s;
+  box-shadow: 0 2px 8px rgba(233, 69, 96, 0.3);
 }
 .btn-primary:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 .btn-primary:hover:not(:disabled) {
-  opacity: 0.85;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(233, 69, 96, 0.4);
 }
 .error {
-  color: #ef4444;
+  color: var(--red, #f44336);
   font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.error::before {
+  content: '⚠';
 }
 .switch-link {
   text-align: center;
   font-size: 0.85rem;
-  color: #888;
+  color: var(--text-muted, #718096);
 }
 .switch-link a {
   color: #e94560;
   cursor: pointer;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+.switch-link a:hover {
+  color: #ff6b8a;
 }
 </style>

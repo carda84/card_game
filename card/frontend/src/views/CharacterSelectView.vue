@@ -58,13 +58,13 @@ function selectAndGo(char) {
 <style scoped>
 .char-select-page { min-height: 100vh; background: transparent; }
 .page-content { padding: 2rem; max-width: 1000px; margin: 0 auto; }
-.page-content h2 { color: #e0e0e0; margin-bottom: 4px; }
-.subtitle { color: #888; margin-bottom: 20px; font-size: 0.9rem; }
+.page-content h2 { color: var(--text-primary); margin-bottom: 4px; }
+.subtitle { color: var(--text-muted); margin-bottom: 24px; font-size: 0.9rem; }
 
-.loading { text-align: center; padding: 40px; color: #888; }
+.loading { text-align: center; padding: 40px; color: var(--text-muted); }
 .spinner {
   width: 40px; height: 40px;
-  border: 4px solid #0f3460; border-top-color: #e94560;
+  border: 4px solid var(--border, #1e3a5f); border-top-color: #e94560;
   border-radius: 50%; animation: spin 1s linear infinite;
   margin: 0 auto 12px;
 }
@@ -72,32 +72,88 @@ function selectAndGo(char) {
 
 .character-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 16px;
 }
 .character-card {
-  background: #16213e;
-  border: 2px solid #0f3460;
-  border-radius: 10px;
-  padding: 16px;
+  background: var(--bg-card, #16213e);
+  border: 2px solid var(--border, #1e3a5f);
+  border-radius: var(--radius-md, 10px);
+  padding: 18px;
   cursor: pointer;
-  transition: border-color 0.2s, transform 0.2s;
+  transition: all 0.25s;
+  position: relative;
+  overflow: hidden;
 }
-.character-card:hover { border-color: #e94560; transform: translateY(-3px); }
-.character-card.selected { border-color: #ffd700; box-shadow: 0 0 20px rgba(255,215,0,0.15); }
-.character-card h3 { color: #e94560; margin: 0 0 8px; }
-.char-stats { display: flex; gap: 12px; color: #ccc; font-size: 0.9rem; margin-bottom: 6px; }
-.desc { color: #a0a0a0; font-size: 0.82rem; margin: 6px 0; line-height: 1.4; }
-.char-badges { margin-top: 8px; }
-.badge-free { background: #28a745; padding: 2px 8px; border-radius: 4px; font-size: 0.78rem; color: white; }
-.badge-price { color: #ffd700; font-size: 0.85rem; }
+.character-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.02), transparent);
+  pointer-events: none;
+}
+.character-card:hover {
+  border-color: #e94560;
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-brand, 0 4px 20px rgba(233, 69, 96, 0.2));
+}
+.character-card.selected {
+  border-color: var(--gold, #ffd700);
+  box-shadow: 0 0 24px rgba(255, 215, 0, 0.2);
+}
+.character-card h3 {
+  color: #e94560;
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+}
+.char-stats {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.char-stats span {
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #a0aec0);
+}
+.desc {
+  color: var(--text-muted, #718096);
+  font-size: 0.82rem;
+  margin: 8px 0;
+  line-height: 1.5;
+}
+.char-badges { margin-top: 10px; }
+.badge-free {
+  background: rgba(74, 222, 128, 0.15);
+  color: var(--green, #4ade80);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  padding: 3px 10px;
+  border-radius: 50px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.badge-price {
+  color: var(--gold, #ffd700);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
 
-.back-row { margin-top: 24px; text-align: center; }
+.back-row { margin-top: 28px; text-align: center; }
 .btn {
-  padding: 8px 18px; border: none; border-radius: 6px;
+  padding: 9px 20px; border: none; border-radius: var(--radius-sm, 6px);
   color: white; cursor: pointer; font-size: 0.9rem;
   text-decoration: none; display: inline-block; transition: all 0.2s;
 }
-.btn-ghost { background: transparent; border: 1px solid #0f3460; color: #ccc; }
-.btn-ghost:hover { border-color: #ffd700; color: #ffd700; }
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border, #1e3a5f);
+  color: var(--text-secondary, #a0aec0);
+}
+.btn-ghost:hover {
+  border-color: var(--gold, #ffd700);
+  color: var(--gold);
+  background: rgba(255, 215, 0, 0.05);
+}
 </style>

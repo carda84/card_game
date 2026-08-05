@@ -20,11 +20,11 @@
           <div class="modal-stats" v-if="card">
             <span class="stat health">❤️ {{ card.health }}</span>
             <span class="stat attack">⚔️ {{ card.attack ?? '特殊' }}</span>
-            <span class="stat cost">🩸{{ card.bloodCost }}</span>
+            <span class="stat cost"><img :src="bloodImg" class="icon-sm" />{{ card.bloodCost }}</span>
             <span v-if="card.boneCost > 0" class="stat cost">🦴{{ card.boneCost }}</span>
           </div>
           <p v-if="card?.sigils" class="modal-sigils">✨ {{ card.sigils }}</p>
-          <p v-if="card?.races" class="modal-races">🏷️ {{ card.races }}</p>
+          <p v-if="card?.races" class="modal-races"><img :src="raceImg" class="icon-sm" />{{ card.races }}</p>
           <p v-if="card?.description" class="modal-desc">{{ card.description }}</p>
         </div>
       </div>
@@ -35,6 +35,8 @@
 <script setup>
 import { computed } from 'vue'
 import { getCardImage } from '../../utils/cardImages'
+import bloodImg from '../../assets/images/blood.png'
+import raceImg from '../../assets/images/race.png'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -140,8 +142,9 @@ function close() {
 .stat { font-size: 0.95rem; }
 .stat.health { color: #ff6b6b; }
 .stat.attack { color: #ffa07a; }
-.stat.cost { color: #aaa; }
+.stat.cost { color: #ff6b6b; display: inline-flex; align-items: center; gap: 3px; }
+.icon-sm { width: 18px; height: 18px; object-fit: contain; vertical-align: middle; }
 .modal-sigils { color: #a78bfa; margin: 4px 0; font-size: 0.9rem; }
-.modal-races { color: #60a5fa; margin: 4px 0; font-size: 0.9rem; }
+.modal-races { color: #60a5fa; margin: 4px 0; font-size: 0.9rem; display: flex; align-items: center; gap: 4px; }
 .modal-desc { color: #888; font-size: 0.85rem; margin-top: 8px; font-style: italic; }
 </style>

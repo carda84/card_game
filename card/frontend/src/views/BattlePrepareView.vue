@@ -121,40 +121,50 @@ import NavBar from '../components/common/NavBar.vue'
   display: flex;
   align-items: center;
   gap: 18px;
-  background: #16213e;
-  border: 1px solid #0f3460;
-  border-radius: 12px;
+  background: var(--bg-card, #16213e);
+  border: 1px solid var(--border, #1e3a5f);
+  border-radius: var(--radius-md, 10px);
   padding: 18px 24px;
   text-align: left;
-  transition: border-color 0.25s, transform 0.2s, box-shadow 0.25s;
+  transition: all 0.25s;
+  position: relative;
+  overflow: hidden;
+}
+.step-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.02), transparent);
+  pointer-events: none;
 }
 .step-card:hover {
   border-color: #e94560;
-  transform: translateX(6px);
-  box-shadow: 0 4px 20px rgba(233, 69, 96, 0.15);
+  transform: translateX(8px);
+  box-shadow: 0 4px 24px rgba(233, 69, 96, 0.15);
 }
 
 .step-num {
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
   background: linear-gradient(135deg, #e94560, #c93050);
   color: white;
   font-weight: bold;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 10px rgba(233, 69, 96, 0.3);
 }
 
 .step-info h3 {
-  color: #e0e0e0;
+  color: var(--text-primary, #f0f0f0);
   font-size: 1.05rem;
   margin-bottom: 3px;
 }
 .step-info p {
-  color: #888;
+  color: var(--text-muted, #718096);
   font-size: 0.85rem;
   margin: 0;
 }
