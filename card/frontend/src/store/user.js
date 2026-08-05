@@ -13,6 +13,7 @@ export const useUserStore = defineStore('user', () => {
   const uniqueTag = ref(localStorage.getItem('uniqueTag') || '')
   const gold = ref(Number(localStorage.getItem('gold')) || 0)
   const points = ref(Number(localStorage.getItem('points')) || 0)
+  const avatar = ref(localStorage.getItem('avatar') || '')
 
   // ===== 计算属性 =====
   const isLoggedIn = computed(() => !!token.value)
@@ -54,6 +55,16 @@ export const useUserStore = defineStore('user', () => {
     localStorage.setItem('points', String(newPoints))
   }
 
+  /** 更新头像 */
+  function updateAvatar(avatarUrl) {
+    avatar.value = avatarUrl
+    if (avatarUrl) {
+      localStorage.setItem('avatar', avatarUrl)
+    } else {
+      localStorage.removeItem('avatar')
+    }
+  }
+
   /** 登出，清除所有状态 */
   async function logout() {
     try {
@@ -71,12 +82,14 @@ export const useUserStore = defineStore('user', () => {
     uniqueTag.value = ''
     gold.value = 0
     points.value = 0
+    avatar.value = ''
 
     localStorage.removeItem('token')
     localStorage.removeItem('nickname')
     localStorage.removeItem('uniqueTag')
     localStorage.removeItem('gold')
     localStorage.removeItem('points')
+    localStorage.removeItem('avatar')
   }
 
   return {
@@ -86,6 +99,7 @@ export const useUserStore = defineStore('user', () => {
     uniqueTag,
     gold,
     points,
+    avatar,
     // computed
     isLoggedIn,
     fullId,
@@ -94,6 +108,7 @@ export const useUserStore = defineStore('user', () => {
     setUserData,
     updateGold,
     updatePoints,
+    updateAvatar,
     logout,
     clearUserData
   }

@@ -14,7 +14,10 @@
     </div>
     <div class="navbar-user">
       <router-link to="/profile" class="user-chip" title="个人简介">
-        <span class="user-avatar">{{ userStore.nickname?.charAt(0) || '?' }}</span>
+        <span class="user-avatar">
+          <img v-if="userStore.avatar" :src="userStore.avatar" class="avatar-img" alt="" />
+          <span v-else>{{ userStore.nickname?.charAt(0) || '?' }}</span>
+        </span>
         <span class="user-name">{{ userStore.fullId }}</span>
       </router-link>
       <div class="resource-pills">
@@ -100,6 +103,14 @@ async function handleLogout() {
   background: linear-gradient(135deg, #e94560, #c23152);
   display: flex; align-items: center; justify-content: center;
   font-size: 0.85rem; font-weight: 700; color: white; flex-shrink: 0;
+  overflow: hidden;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .user-name {
   font-size: 0.82rem; color: var(--text-secondary, #a0aec0);

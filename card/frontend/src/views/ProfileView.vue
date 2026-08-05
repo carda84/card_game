@@ -11,7 +11,20 @@
         <!-- 用户信息卡片 -->
         <div class="profile-card hero-card">
           <div class="avatar-section">
-            <div class="avatar-circle">{{ profile.nickname?.charAt(0) || '?' }}</div>
+            <div class="avatar-circle" @click="triggerAvatarUpload">
+              <img v-if="profile.avatar" :src="profile.avatar" class="avatar-img" alt="头像" />
+              <span v-else>{{ profile.nickname?.charAt(0) || '?' }}</span>
+              <div class="avatar-overlay">📷</div>
+            </div>
+            <input
+              ref="avatarInput"
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              style="display: none"
+              @change="handleAvatarUpload"
+            />
+            <span v-if="uploading" class="upload-loading">上传中...</span>
+            <span v-if="uploadError" class="upload-error">{{ uploadError }}</span>
           </div>
           <div class="hero-info">
             <h2 class="hero-name">{{ profile.fullId }}</h2>
@@ -141,11 +154,52 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { getProfile } from '../api/user'
+import { getProfile, uploadAvatar } from '../api/user'
+import { useUserStore } from '../store/user'
 import NavBar from '../components/common/NavBar.vue'
 
+const userStore = useUserStore()
 const loading = ref(true)
 const profile = ref(null)
+const avatarInput = ref(null)
+const uploading = ref(false)
+const uploadError = ref('')
+
+function triggerAvatarUpload() {
+  avatarInput.value?.click()
+}
+
+async function handleAvatarUpload(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+
+  // 重置错误
+  uploadError.value = ''
+
+  // 校验文件大小 (5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    uploadError.value = '文件大小不能超过 5MB'
+    return
+  }
+
+  uploading.value = true
+  try {
+    const result = await uploadAvatar(file)
+    // 更新头像 URL
+    if (profile.value) {
+      profile.value.avatar = result.avatar
+    }
+    userStore.updateAvatar(result.avatar)
+  } catch (e) {
+    uploadError.value = e.message || '上传失败'
+  } finally {
+    uploading.value = false
+    // 重置 input，允许再次选择同一文件
+    if (avatarInput.value) {
+      avatarInput.value.value = ''
+    }
+  }
+}
 
 const pveWinRate = computed(() => {
   if (!profile.value || profile.value.pveBattles === 0) return '0.0'
@@ -160,6 +214,10 @@ const pvpWinRate = computed(() => {
 onMounted(async () => {
   try {
     profile.value = await getProfile()
+    // 同步头像到 store
+    if (profile.value?.avatar) {
+      userStore.updateAvatar(profile.value.avatar)
+    }
   } catch (e) {
     console.error('加载个人简介失败', e)
   } finally {
@@ -228,6 +286,51 @@ onMounted(async () => {
   color: #fff;
   flex-shrink: 0;
   box-shadow: 0 0 16px rgba(233, 69, 96, 0.4);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.avatar-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.avatar-circle:hover .avatar-overlay {
+  opacity: 1;
+}
+
+.avatar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.upload-loading {
+  font-size: 0.7rem;
+  color: #ffd700;
+}
+
+.upload-error {
+  font-size: 0.7rem;
+  color: #f44336;
+  max-width: 80px;
+  text-align: center;
 }
 
 .hero-info {

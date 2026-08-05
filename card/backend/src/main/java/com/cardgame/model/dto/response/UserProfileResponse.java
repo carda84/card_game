@@ -22,6 +22,7 @@ public class UserProfileResponse {
     private String fullId;       // nickname#uniqueTag
     private String email;
     private String createdAt;    // 注册时间
+    private String avatar;       // 头像 URL
 
     // ===== 资源 =====
     private Integer gold;

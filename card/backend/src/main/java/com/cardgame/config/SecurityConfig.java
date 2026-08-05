@@ -47,6 +47,7 @@ public class SecurityConfig {
                 // 公开接口
                 .requestMatchers(
                     "/api/auth/**",          // 注册/登录/发送验证码
+                    "/uploads/**",            // 上传的静态资源（头像等）
                     "/h2-console/**",        // H2 数据库控制台（仅 dev）
                     "/error"                 // Spring 默认错误页
                 ).permitAll()

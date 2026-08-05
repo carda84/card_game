@@ -1,0 +1,26 @@
+# ===== 测试环境配置 =====
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+# JWT 配置（测试用）
+app:
+  jwt:
+    secret: test-secret-key-at-least-32-chars-long-for-test-only
+    expiration-hours: 24
+    remember-me-expiration-hours: 336
+  verification:
+    code-expiry-minutes: 10
+    resend-cooldown-seconds: 60
+  upload:
+    avatar-dir: target/test-uploads

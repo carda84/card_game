@@ -51,6 +51,13 @@ public class User {
     private Integer points = 0;
 
     /**
+     * 头像文件名（如 "avatar_1234567890_abc.jpg"）
+     * 上传头像后保存，前端通过静态资源路径访问
+     */
+    @Column(length = 100)
+    private String avatar;
+
+    /**
      * 已解锁人物 ID 列表（逗号分隔，如 "1,3"）
      * 默认人物（isDefault=true）无需解锁，始终可用
      * 购买解锁的人物 ID 会追加到此字段

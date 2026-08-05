@@ -2,13 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main, master]
   pull_request:
     branches: [main, master]
 
 jobs:
+  # ===== 后端单元测试 =====
   unit-test:
-    name: unit-test
+    name: Backend Unit Tests
     runs-on: ubuntu-latest
 
     services:
@@ -29,12 +30,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 21
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "17"
           cache: maven
+          cache-dependency-path: card/backend/pom.xml
 
       - name: Run backend tests
         working-directory: card/backend
@@ -47,6 +49,15 @@ jobs:
           MAIL_PASSWORD: test
         run: mvn test -B
 
+  # ===== 前端构建验证 =====
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -54,7 +65,7 @@ jobs:
           cache: npm
           cache-dependency-path: card/frontend/package-lock.json
 
-      - name: Install frontend dependencies
+      - name: Install dependencies
         working-directory: card/frontend
         run: npm ci
 
@@ -62,10 +73,11 @@ jobs:
         working-directory: card/frontend
         run: npm run build
 
+  # ===== Docker Compose 构建验证 =====
   docker-build:
-    name: docker-build
+    name: Docker Compose Build
     runs-on: ubuntu-latest
-    needs: unit-test
+    needs: [unit-test, build-frontend]
 
     steps:
       - name: Checkout code
@@ -77,82 +89,4 @@ jobs:
           JWT_SECRET: ci-test-secret-key-at-least-32-chars-long
           MAIL_USERNAME: test@example.com
           MAIL_PASSWORD: test
-        run: docker-compose build
-name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-jobs:
-  unit-test:
-    name: Backend Unit Tests
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: card/backend
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-          cache: maven
-
-      - name: Run Tests
-        run: mvn -B test
-
-  build-backend:
-    name: Build Backend Image
-    runs-on: ubuntu-latest
-    needs: unit-test
-    defaults:
-      run:
-        working-directory: card/backend
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-          cache: maven
-
-      - name: Package JAR
-        run: mvn -B package -DskipTests
-
-      - name: Build Docker Image
-        run: docker build -t card-game-backend:latest .
-
-  build-frontend:
-    name: Build Frontend
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: card/frontend
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: card/frontend/package-lock.json
-
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
+        run: docker compose build
